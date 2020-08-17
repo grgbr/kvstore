@@ -1,0 +1,59 @@
+config KVSTORE_BTRACE
+	bool "Backtrace support"
+	default n
+	help
+	  Build kvstore library with support for libbtrace.
+
+config KVSTORE_ASSERT
+	bool "Assertion"
+	default n
+	help
+	  Build kvstore library with assertion support.
+
+config KVSTORE_DEBUG
+	bool "Verbose debug output"
+	default n
+	help
+	  Build kvstore library with ability to output verbose debugging
+	  messages.
+
+config KVSTORE_ATTR
+	bool "Attribute store"
+	default y
+	help
+	  Build kvstore library with attributes store support.
+
+config KVSTORE_LOG
+	bool
+	default n
+	help
+	  Build kvstore library with its own internal log record support.
+
+config KVSTORE_FILE
+	bool "Filesystem file transactional operations"
+	default y
+	select KVSTORE_LOG
+	help
+	  Build kvstore library with support for transactional operations upon
+	  underlying filesystem file entries.
+
+config KVSTORE_TYPE_INADDR
+	bool "IPv4 address"
+	default y
+	help
+	  Build kvstore library to provide functions for loading / storing
+	  IPv4 addresses.
+
+config KVSTORE_TYPE_IN6ADDR
+	bool "IPv6 address"
+	default y
+	help
+	  Build kvstore library to provide functions for loading / storing
+	  IPv6 addresses.
+
+config KVSTORE_TYPE_STRPILE
+	bool "String pile"
+	default y
+	help
+	  Build kvstore library to provide functions for loading / storing
+	  string piles, i.e. unordered list of dynamically allocated strings.
