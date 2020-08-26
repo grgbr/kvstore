@@ -6,6 +6,7 @@ libkvstore.so-objs     = store.o
 libkvstore.so-objs    += $(call kconf_enabled,KVSTORE_LOG,log.o)
 libkvstore.so-objs    += $(call kconf_enabled,KVSTORE_FILE,file.o)
 libkvstore.so-objs    += $(call kconf_enabled,KVSTORE_ATTR,attr.o)
+libkvstore.so-objs    += $(call kconf_enabled,KVSTORE_STRIDX,stridx.o)
 libkvstore.so-cflags  := $(EXTRA_CFLAGS) -Wall -Wextra -D_GNU_SOURCE -DPIC -fpic
 libkvstore.so-ldflags  = $(EXTRA_LDFLAGS) \
                          -shared -fpic -Wl,-soname,libkvstore.so \
@@ -17,6 +18,7 @@ HEADERDIR             := $(CURDIR)/include
 headers                = kvstore/store.h
 headers               += $(call kconf_enabled,KVSTORE_ATTR,kvstore/attr.h)
 headers               += $(call kconf_enabled,KVSTORE_FILE,kvstore/file.h)
+headers               += $(call kconf_enabled,KVSTORE_STRIDX,kvstore/stridx.h)
 
 bins                  := kvs_test
 kvs_test-objs         := test.o

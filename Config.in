@@ -23,6 +23,12 @@ config KVSTORE_ATTR
 	help
 	  Build kvstore library with attributes store support.
 
+config KVSTORE_STRIDX
+	bool "String index"
+	default y
+	help
+	  Build kvstore library with string index store support.
+
 config KVSTORE_LOG
 	bool
 	default n
