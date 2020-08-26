@@ -46,7 +46,6 @@ struct kvs_iter {
 	DBC *curs;
 };
 
-
 struct kvs_xact {
 	DB_TXN *txn;
 };

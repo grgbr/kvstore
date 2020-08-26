@@ -84,11 +84,10 @@ kvs_attr_load_num(const struct kvs_store *store,
 	kvs_assert(attr_id < UINT_MAX);
 	kvs_assert(size);
 
-	int ret;
-
 	db_recno_t id = (db_recno_t)attr_id + 1;
 	DBT        key = { .data = &id, .size = sizeof(id), 0 };
 	DBT        item = { 0 };
+	int        ret;
 
 	ret = kvs_get(store, xact, &key, &item, 0);
 	kvs_assert(ret != -EXDEV);
@@ -122,11 +121,10 @@ kvs_attr_store_num(const struct kvs_store *store,
 	kvs_assert(num);
 	kvs_assert(size);
 
-	int ret;
-
 	db_recno_t id = (db_recno_t)attr_id + 1;
 	DBT        key = { .data = &id, .size = sizeof(id), 0 };
 	DBT        item = { .data = (void *)num, .size = size, 0 };
+	int        ret;
 
 	ret = kvs_put(store, xact, &key, &item, 0);
 	kvs_assert(ret != -EEXIST);
@@ -141,10 +139,9 @@ kvs_attr_clear(const struct kvs_store *store,
 {
 	kvs_assert(attr_id < UINT_MAX);
 
-	int ret;
-
 	db_recno_t id = (db_recno_t)attr_id + 1;
 	DBT        key = { .data = &id, .size = sizeof(id), 0 };
+	int        ret;
 
 	ret = kvs_del(store, xact, &key);
 	kvs_assert(ret != -EXDEV);
@@ -196,11 +193,11 @@ kvs_attr_load_str(const struct kvs_store  *store,
 {
 	kvs_assert(attr_id < UINT_MAX);
 
-	int ret;
-
 	db_recno_t id = (db_recno_t)attr_id + 1;
 	DBT        key = { .data = &id, .size = sizeof(id), 0 };
 	DBT        item = { 0 };
+	int        ret;
+
 
 	ret = kvs_get(store, xact, &key, &item, 0);
 	kvs_assert(ret != -EXDEV);
@@ -227,11 +224,10 @@ kvs_attr_store_str(const struct kvs_store *store,
 	kvs_assert(attr_id < UINT_MAX);
 	kvs_assert(str);
 
-	int ret;
-
 	db_recno_t id = (db_recno_t)attr_id + 1;
 	DBT        key = { .data = &id, .size = sizeof(id), 0 };
 	DBT        item = { .data = len ? (char *)str : NULL, .size = len, 0 };
+	int        ret;
 
 	if (len >= KVS_STR_MAX)
 		return -ENAMETOOLONG;
@@ -261,11 +257,10 @@ kvs_attr_load_strpile(const struct kvs_store  *store,
 {
 	kvs_assert(attr_id < UINT_MAX);
 
-	db_recno_t                   id = (db_recno_t)attr_id + 1;
-	DBT                          key = { .data = &id,
-	                                     .size = sizeof(id), 0 };
-	DBT                          item = { 0 };
-	int                          ret;
+	db_recno_t id = (db_recno_t)attr_id + 1;
+	DBT        key = { .data = &id, .size = sizeof(id), 0 };
+	DBT        item = { 0 };
+	int        ret;
 
 	ret = kvs_get(store, xact, &key, &item, 0);
 	kvs_assert(ret != -EXDEV);
@@ -284,10 +279,10 @@ kvs_attr_store_strpile(const struct kvs_store  *store,
 {
 	kvs_assert(attr_id < UINT_MAX);
 
-	db_recno_t         id = (db_recno_t)attr_id + 1;
-	DBT                key = { .data = &id, .size = sizeof(id), 0 };
-	DBT                item = { 0, };
-	int                ret;
+	db_recno_t id = (db_recno_t)attr_id + 1;
+	DBT        key = { .data = &id, .size = sizeof(id), 0 };
+	DBT        item = { 0, };
+	int        ret;
 
 	ret = kvs_serialize_strpile(pile, &item.data);
 	if (ret < 0)
