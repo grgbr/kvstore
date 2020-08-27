@@ -58,6 +58,29 @@ kvs_err_from_bdb(int err)
 	}
 }
 
+const char *
+kvs_strerror(int err)
+{
+	switch (err) {
+	case -ENOENT:
+		return "Key/data pair not found";
+	case -EEXIST:
+		return "Key/data pair already exists";
+	case -EXDEV:
+		return "Bad secondary index";
+	case -ENOKEY:
+		return "Key empty";
+	case -EDEADLOCK:
+		return "Deadlock detected";
+	case DB_LOCK_NOTGRANTED:
+		return "Lock not granted";
+	case DB_RUNRECOVERY:
+		return "Unrecoverable error";
+	default:
+		return strerror(-err);
+	}
+}
+
 int
 kvs_dup_str(char **string, const void *data, size_t len)
 {

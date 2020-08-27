@@ -77,4 +77,7 @@ kvs_enable_verb(FILE       *out_file,
 extern void
 kvs_disable_verb(void);
 
+extern const char *
+kvs_strerror(int err);
+
 #endif /* _KVS_STORE_H */
