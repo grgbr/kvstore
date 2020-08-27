@@ -23,6 +23,12 @@ config KVSTORE_ATTR
 	help
 	  Build kvstore library with attributes store support.
 
+config KVSTORE_AUTOIDX
+	bool "Auto index"
+	default y
+	help
+	  Build kvstore library with automatic indexing store support.
+
 config KVSTORE_STRIDX
 	bool "String index"
 	default y
