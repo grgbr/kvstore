@@ -519,6 +519,8 @@ kvs_open_store(struct kvs_store       *store,
 	kvs_assert(path);
 	kvs_assert(*path);
 	kvs_assert(!name || *name);
+	kvs_assert(!((type == DB_HEAP) && name));
+	kvs_assert(!((type == DB_QUEUE) && name));
 
 	int err;
 
@@ -619,7 +621,10 @@ kvs_open_depot(struct kvs_depot *depot,
 	 * with proper error handling if path cannot be created or already
 	 * exists and is not a readable / writeable directory.
 	 */
-	mkdir(path, mode);
+	if (mkdir(path, mode)) {
+		if (errno != EEXIST)
+			return -errno;
+	}
 
 	/* Generate a unique system wide System V IPC key. */
 	key = ftok(path, 'F');
