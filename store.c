@@ -613,23 +613,12 @@ kvs_open_depot(struct kvs_depot *depot,
 	                       KVS_DEPOT_RDONLY)));
 	kvs_assert(mode);
 
-	int   err;
-	key_t key;
+	int err;
 
-	/*
-	 * Don't bother checking error code since subsequent db calls will fail
-	 * with proper error handling if path cannot be created or already
-	 * exists and is not a readable / writeable directory.
-	 */
 	if (mkdir(path, mode)) {
 		if (errno != EEXIST)
 			return -errno;
 	}
-
-	/* Generate a unique system wide System V IPC key. */
-	key = ftok(path, 'F');
-	if (key < 0)
-		return -errno;
 
 	err = db_env_create(&depot->env, 0);
 	if (err)
@@ -660,30 +649,57 @@ kvs_open_depot(struct kvs_depot *depot,
 		depot->env->set_msgcall(depot->env, NULL);
 #endif /* defined(CONFIG_KVSTORE_DEBUG) */
 
-	/*
-	 * Use System V shared memory segment based memory regions to limit
-	 * underlying filesystem I/O activity.
-	 */
-	err = depot->env->set_shm_key(depot->env, key);
-	kvs_assert(!err);
-
 	/* Restrict maximum logging file size. */
 	depot->env->set_lg_max(depot->env, max_log_size);
 
 	kvs_init_log(depot);
 
-	depot->flags = flags & (KVS_DEPOT_MVCC | KVS_DEPOT_RDONLY);
+	depot->flags = flags & (KVS_DEPOT_THREAD |
+	                        KVS_DEPOT_MVCC |
+	                        KVS_DEPOT_RDONLY);
+
+	if (!(flags & KVS_DEPOT_PRIV)) {
+		/*
+		 * Generate a unique system wide System V IPC key for using
+		 * System V shared memory segment based memory regions to limit
+		 * underlying filesystem I/O activity.
+		 */
+		key_t key;
+
+		key = ftok(path, 'F');
+		if (key < 0) {
+			err = -errno;
+			goto err;
+		}
+
+		err = depot->env->set_shm_key(depot->env, key);
+		kvs_assert(!err);
+
+		/*
+		 * Since multiple processes might access the store, init the
+		 * locking subsystem.
+		 * In addition, tell libdb to allocate region memory from system
+		 * shared memory instead of from heap memory or memory backed by
+		 * the filesystem.
+		 */
+		flags |= DB_INIT_LOCK | DB_REGISTER | DB_SYSTEM_MEM;
+	}
+
+	if ((flags & (KVS_DEPOT_THREAD | KVS_DEPOT_RDONLY)) == KVS_DEPOT_THREAD)
+		/*
+		 * If threading requested in read/write mode, init the locking
+		 * subsystem.
+		 */
+		flags |= DB_INIT_LOCK;
 
 	/* Open environment with transaction and automatic recovery support. */
 	err = depot->env->open(depot->env,
 	                       path,
 	                       DB_INIT_MPOOL |
-	                       DB_SYSTEM_MEM |
 	                       DB_INIT_TXN |
 	                       DB_RECOVER |
 	                       DB_CREATE |
-	                       DB_REGISTER |
-	                       (flags & (KVS_DEPOT_PRIV | KVS_DEPOT_THREAD)),
+	                       flags,
 	                       mode & ~(S_IXUSR | S_IXGRP | S_IXOTH));
 	kvs_assert(err != DB_RUNRECOVERY);
 	kvs_assert(err != EINVAL);
