@@ -26,7 +26,6 @@ struct kvs_depot {
 #define KVS_DEPOT_PRIV   (DB_PRIVATE)
 #define KVS_DEPOT_THREAD (DB_THREAD)
 #define KVS_DEPOT_MVCC   (DB_MULTIVERSION)
-#define KVS_DEPOT_RDONLY (DB_RDONLY)
 
 extern int
 kvs_open_depot(struct kvs_depot *depot,

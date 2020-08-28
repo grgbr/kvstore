@@ -609,8 +609,7 @@ kvs_open_depot(struct kvs_depot *depot,
 	kvs_assert(*path);
 	kvs_assert(!(flags & ~(KVS_DEPOT_PRIV |
 	                       KVS_DEPOT_THREAD |
-	                       KVS_DEPOT_MVCC |
-	                       KVS_DEPOT_RDONLY)));
+	                       KVS_DEPOT_MVCC)));
 	kvs_assert(mode);
 
 	int err;
@@ -654,9 +653,7 @@ kvs_open_depot(struct kvs_depot *depot,
 
 	kvs_init_log(depot);
 
-	depot->flags = flags & (KVS_DEPOT_THREAD |
-	                        KVS_DEPOT_MVCC |
-	                        KVS_DEPOT_RDONLY);
+	depot->flags = flags & (KVS_DEPOT_THREAD | KVS_DEPOT_MVCC);
 
 	if (!(flags & KVS_DEPOT_PRIV)) {
 		/*
@@ -685,11 +682,8 @@ kvs_open_depot(struct kvs_depot *depot,
 		flags |= DB_INIT_LOCK | DB_REGISTER | DB_SYSTEM_MEM;
 	}
 
-	if ((flags & (KVS_DEPOT_THREAD | KVS_DEPOT_RDONLY)) == KVS_DEPOT_THREAD)
-		/*
-		 * If threading requested in read/write mode, init the locking
-		 * subsystem.
-		 */
+	if (flags & KVS_DEPOT_THREAD)
+		/* Init the locking subsystem, if threading requested. */
 		flags |= DB_INIT_LOCK;
 
 	/* Open environment with transaction and automatic recovery support. */
