@@ -15,6 +15,11 @@ struct kvs_autoidx_id {
 	DB_HEAP_RID rid;
 };
 
+extern const struct kvs_autoidx_id kvs_autoidx_none;
+
+#define KVS_AUTOIDX_NONE \
+	kvs_autoidx_none
+
 struct kvs_autoidx_desc {
 	struct kvs_autoidx_id  id;
 	const void            *data;

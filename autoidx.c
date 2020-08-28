@@ -2,6 +2,8 @@
 #include <kvstore/autoidx.h>
 #include <string.h>
 
+const struct kvs_autoidx_id kvs_autoidx_none = { .rid = { 0, } };
+
 #define kvs_autoidx_assert_desc(_desc) \
 	kvs_assert(!!(_desc)->data ^ !!kvs_assert((_desc)->size))
 
