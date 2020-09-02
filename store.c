@@ -448,11 +448,18 @@ kvs_put(const struct kvs_store *store,
 	kvs_assert_store(store);
 	kvs_assert_xact(xact);
 	kvs_assert(key);
-	kvs_assert(key->size);
-	kvs_assert(key->data);
+#if defined(CONFIG_KVSTORE_ASSERT)
+	if (flags & DB_APPEND) {
+		kvs_assert(!key->data);
+		kvs_assert(!key->size);
+	}
+	else {
+		kvs_assert(key->data);
+		kvs_assert(key->size);
+	}
+#endif /* defined(CONFIG_KVSTORE_ASSERT) */
 	kvs_assert(item);
-	kvs_assert(item->size);
-	kvs_assert(item->data);
+	kvs_assert(item->data || !item->size);
 
 	int ret;
 
