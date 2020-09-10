@@ -1,8 +1,8 @@
 #include "common.h"
-#include <kvstore/stridx.h>
+#include <kvstore/strrec.h>
 #include <string.h>
 
-#define kvs_stridx_assert_desc(_desc) \
+#define kvs_strrec_assert_desc(_desc) \
 	kvs_assert(_desc); \
 	kvs_assert((_desc)->id); \
 	kvs_assert(*(_desc)->id); \
@@ -11,9 +11,9 @@
 	kvs_assert(!!(_desc)->data ^ !! kvs_assert((_desc)->size))
 
 static int
-kvs_stridx_fill_desc(const DBT              *key,
+kvs_strrec_fill_desc(const DBT              *key,
                      const DBT              *item,
-                     struct kvs_stridx_desc *desc)
+                     struct kvs_strrec_desc *desc)
 {
 	kvs_assert(key->data);
 	kvs_assert(key->size);
@@ -35,7 +35,7 @@ kvs_stridx_fill_desc(const DBT              *key,
 }
 
 int
-kvs_stridx_iter_first(const struct kvs_iter *iter, struct kvs_stridx_desc *desc)
+kvs_strrec_iter_first(const struct kvs_iter *iter, struct kvs_strrec_desc *desc)
 {
 	kvs_assert(desc);
 
@@ -47,11 +47,11 @@ kvs_stridx_iter_first(const struct kvs_iter *iter, struct kvs_stridx_desc *desc)
 	if (err)
 		return err;
 
-	return kvs_stridx_fill_desc(&key, &item, desc);
+	return kvs_strrec_fill_desc(&key, &item, desc);
 }
 
 int
-kvs_stridx_iter_next(const struct kvs_iter *iter, struct kvs_stridx_desc *desc)
+kvs_strrec_iter_next(const struct kvs_iter *iter, struct kvs_strrec_desc *desc)
 {
 	kvs_assert(desc);
 
@@ -63,11 +63,11 @@ kvs_stridx_iter_next(const struct kvs_iter *iter, struct kvs_stridx_desc *desc)
 	if (err)
 		return err;
 
-	return kvs_stridx_fill_desc(&key, &item, desc);
+	return kvs_strrec_fill_desc(&key, &item, desc);
 }
 
 int
-kvs_stridx_init_iter(const struct kvs_store *store,
+kvs_strrec_init_iter(const struct kvs_store *store,
                      const struct kvs_xact  *xact,
                      struct kvs_iter        *iter)
 {
@@ -75,25 +75,25 @@ kvs_stridx_init_iter(const struct kvs_store *store,
 }
 
 int
-kvs_stridx_fini_iter(const struct kvs_iter *iter)
+kvs_strrec_fini_iter(const struct kvs_iter *iter)
 {
 	return kvs_fini_iter(iter);
 }
 
-#define kvs_stridx_assert_id(_id, _len) \
+#define kvs_strrec_assert_id(_id, _len) \
 	kvs_assert(_id); \
 	kvs_assert(*(_id)); \
 	kvs_assert(_len); \
 	kvs_assert((_len) < KVS_STR_MAX)
 
 ssize_t
-kvs_stridx_get(const struct kvs_store  *store,
+kvs_strrec_get(const struct kvs_store  *store,
                const struct kvs_xact   *xact,
                const char              *id,
                size_t                   len,
                const void             **data)
 {
-	kvs_stridx_assert_id(id, len);
+	kvs_strrec_assert_id(id, len);
 	kvs_assert(data);
 
 	DBT key = { .data = (void *)id, .size = len, 0 };
@@ -118,17 +118,17 @@ kvs_stridx_get(const struct kvs_store  *store,
 }
 
 int
-kvs_stridx_get_desc(const struct kvs_store  *store,
+kvs_strrec_get_desc(const struct kvs_store  *store,
                     const struct kvs_xact   *xact,
                     const char              *id,
                     size_t                   len,
-                    struct kvs_stridx_desc  *desc)
+                    struct kvs_strrec_desc  *desc)
 {
 	kvs_assert(desc);
 
 	int ret;
 
-	ret = kvs_stridx_get(store, xact, id, len, &desc->data);
+	ret = kvs_strrec_get(store, xact, id, len, &desc->data);
 	if (ret < 0)
 		return ret;
 
@@ -140,14 +140,14 @@ kvs_stridx_get_desc(const struct kvs_store  *store,
 }
 
 int
-kvs_stridx_put(const struct kvs_store *store,
+kvs_strrec_put(const struct kvs_store *store,
                const struct kvs_xact  *xact,
                const char             *id,
                size_t                  len,
                const void             *data,
                size_t                  size)
 {
-	kvs_stridx_assert_id(id, len);
+	kvs_strrec_assert_id(id, len);
 	kvs_assert(!!data ^ !!size);
 
 	DBT key = { .data = (void *)id, .size = len, 0 };
@@ -157,14 +157,14 @@ kvs_stridx_put(const struct kvs_store *store,
 }
 
 int
-kvs_stridx_add(const struct kvs_store *store,
+kvs_strrec_add(const struct kvs_store *store,
                const struct kvs_xact  *xact,
                const char             *id,
                size_t                  len,
                const void             *data,
                size_t                  size)
 {
-	kvs_stridx_assert_id(id, len);
+	kvs_strrec_assert_id(id, len);
 	kvs_assert(!!data ^ !!size);
 
 	DBT key = { .data = (void *)id, .size = len, 0 };
@@ -174,12 +174,12 @@ kvs_stridx_add(const struct kvs_store *store,
 }
 
 int
-kvs_stridx_del(const struct kvs_store *store,
+kvs_strrec_del(const struct kvs_store *store,
                const struct kvs_xact  *xact,
                const char             *id,
                size_t                  len)
 {
-	kvs_stridx_assert_id(id, len);
+	kvs_strrec_assert_id(id, len);
 
 	DBT key = { .data = (void *)id, .size = len, 0 };
 
@@ -187,7 +187,7 @@ kvs_stridx_del(const struct kvs_store *store,
 }
 
 int
-kvs_stridx_open(struct kvs_store       *store,
+kvs_strrec_open(struct kvs_store       *store,
                 const struct kvs_depot *depot,
                 const struct kvs_xact  *xact,
                 const char             *path,
@@ -198,7 +198,7 @@ kvs_stridx_open(struct kvs_store       *store,
 }
 
 int
-kvs_stridx_close(const struct kvs_store *store)
+kvs_strrec_close(const struct kvs_store *store)
 {
 	return kvs_close_store(store);
 }

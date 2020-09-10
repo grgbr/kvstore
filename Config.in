@@ -29,11 +29,11 @@ config KVSTORE_AUTOREC
 	help
 	  Build kvstore library with automatic record primary keying support.
 
-config KVSTORE_STRIDX
-	bool "String index"
+config KVSTORE_STRREC
+	bool "String record"
 	default y
 	help
-	  Build kvstore library with string index store support.
+	  Build kvstore library with string based record primary keying support.
 
 config KVSTORE_LOG
 	bool
