@@ -391,7 +391,8 @@ kvs_init_iter(const struct kvs_store *store,
               const struct kvs_xact  *xact,
               struct kvs_iter        *iter)
 {
-	kvs_assert_store(store);
+	kvs_assert(store);
+	kvs_assert(store->db);
 	kvs_assert_xact(xact);
 	kvs_assert(iter);
 
@@ -423,7 +424,8 @@ kvs_get(const struct kvs_store *store,
         DBT                    *item,
         unsigned int            flags)
 {
-	kvs_assert_store(store);
+	kvs_assert(store);
+	kvs_assert(store->db);
 	kvs_assert_xact(xact);
 	kvs_assert(key);
 	kvs_assert(key->size);
@@ -445,7 +447,8 @@ kvs_put(const struct kvs_store *store,
         DBT                    *item,
         unsigned int            flags)
 {
-	kvs_assert_store(store);
+	kvs_assert(store);
+	kvs_assert(store->db);
 	kvs_assert_xact(xact);
 	kvs_assert(key);
 #if defined(CONFIG_KVSTORE_ASSERT)
@@ -464,7 +467,11 @@ kvs_put(const struct kvs_store *store,
 	int ret;
 
 	ret = store->db->put(store->db, xact->txn, key, item, flags);
-	kvs_assert(ret != EINVAL);
+
+	/*
+	 * Note: will return EINVAL in case of violation of unique secondary
+	 * index integrity contraint.
+	 */
 
 	return kvs_err_from_bdb(ret);
 }
@@ -474,7 +481,8 @@ kvs_del(const struct kvs_store *store,
         const struct kvs_xact  *xact,
         DBT                    *key)
 {
-	kvs_assert_store(store);
+	kvs_assert(store);
+	kvs_assert(store->db);
 	kvs_assert_xact(xact);
 	kvs_assert(key);
 	kvs_assert(key->size);
@@ -488,30 +496,13 @@ kvs_del(const struct kvs_store *store,
 	return kvs_err_from_bdb(ret);
 }
 
-int
-kvs_close_store(const struct kvs_store *store)
-{
-	kvs_assert_store(store);
-
-	int ret;
-
-	/*
-	 * Although not strictly required, it is recommended to close all db
-	 * handles before closing the environment.
-	 *
-	 * Warning: all cursors should be closed, all transactions resolved
-	 * before closing db handles !
-	 *
-	 * Use DB_NOSYNC to spare flash memory write / erase cycles. It should
-	 * be set ONLY when LOGGING and TRANSACTIONS enabled so that the
-	 * database is recoverable after system / application crashes.
-	 */
-	ret = store->db->close(store->db, DB_NOSYNC);
-	kvs_assert(ret != EINVAL);
-
-	return kvs_err_from_bdb(ret);
-}
-
+/*
+ * Warning !
+ * Even if open failed, close method SHALL be called ! The reason why is that
+ * the transaction given in argument MUST be closed before closing the store
+ * itself.
+ * See the Berkeley DB->close() documentation for more infos.
+ */
 int
 kvs_open_store(struct kvs_store       *store,
                const struct kvs_depot *depot,
@@ -533,8 +524,10 @@ kvs_open_store(struct kvs_store       *store,
 
 	err = db_create(&store->db, depot->env, 0);
 	kvs_assert(err != EINVAL);
-	if (err)
+	if (err) {
+		store->db = NULL;
 		return kvs_err_from_bdb(err);
+	}
 
 	err = store->db->open(store->db,
 	                      xact ? xact->txn : NULL,
@@ -547,19 +540,108 @@ kvs_open_store(struct kvs_store       *store,
 	kvs_assert(err != EINVAL);
 	kvs_assert(err != DB_REP_HANDLE_DEAD);
 	kvs_assert(err != DB_REP_LOCKOUT);
-	if (err)
-		goto err;
-
-	return 0;
-
-err:
-	/*
-	 * Even if open failed, close method should be called to discard the DB
-	 * handle.
-	 */
-	kvs_close_store(store);
 
 	return kvs_err_from_bdb(err);
+}
+
+int
+kvs_close_store(const struct kvs_store *store)
+{
+	kvs_assert(store);
+
+	if (store->db) {
+		int ret;
+
+		/*
+		 * Although not strictly required, it is recommended to close
+		 * all db handles before closing the environment.
+		 *
+		 * Warning: all cursors should be closed, all transactions
+		 * resolved before closing db handles !
+		 *
+		 * Use DB_NOSYNC to spare flash memory write / erase cycles. It
+		 * should be set ONLY when LOGGING and TRANSACTIONS enabled so
+		 * that the database is recoverable after system / application
+		 * crashes.
+		 */
+		ret = store->db->close(store->db, DB_NOSYNC);
+		kvs_assert(ret != EINVAL);
+
+		return kvs_err_from_bdb(ret);
+	}
+
+	return 0;
+}
+
+static int
+kvs_bind_index(DB *index, const DBT *pkey, const DBT *pitem, DBT *skey)
+{
+	kvs_assert(index);
+	kvs_assert(index->app_private);
+	kvs_assert(pkey);
+	kvs_assert(pkey->data);
+	kvs_assert(pkey->size);
+	kvs_assert(pitem);
+	kvs_assert(skey);
+
+	kvs_bind_index_fn *bind = index->app_private;
+	ssize_t            ret;
+
+	if (!pitem->size)
+		return -EMSGSIZE;
+
+	if (!pitem->data)
+		return -ENODATA;
+
+	ret = bind(pkey->data,
+	           pkey->size,
+	           pitem->data,
+	           pitem->size,
+	           &skey->data);
+	if (ret <= 0)
+		return (!ret) ? DB_DONOTINDEX : ret;
+
+	kvs_assert(skey->data);
+
+	skey->size = (size_t)ret;
+
+	return 0;
+}
+
+int
+kvs_open_index(struct kvs_store       *index,
+               const struct kvs_store *store,
+               const struct kvs_depot *depot,
+               const struct kvs_xact  *xact,
+               const char             *path,
+               const char             *name,
+               mode_t                  mode,
+               kvs_bind_index_fn      *bind)
+{
+	int err;
+
+	err = kvs_open_store(index, depot, xact, path, name, DB_BTREE, mode);
+	if (err)
+		return kvs_err_from_bdb(err);
+
+	index->db->app_private = bind;
+
+	err = store->db->associate(store->db,
+	                           xact->txn,
+	                           index->db,
+	                           kvs_bind_index,
+	                           DB_CREATE);
+	kvs_assert(err != EINVAL);
+	kvs_assert(err != DB_REP_HANDLE_DEAD);
+	kvs_assert(err != DB_REP_LOCKOUT);
+
+	return kvs_err_from_bdb(err);
+}
+
+int
+kvs_close_index(const struct kvs_store *store)
+{
+	return kvs_close_store(store);
 }
 
 int

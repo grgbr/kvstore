@@ -26,10 +26,6 @@ kvs_env_dbg(DB_ENV *env __unused, const char *fmt __unused, ...)
 	kvs_assert((_depot)->env); \
 	kvs_assert(!((_depot)->flags & ~(KVS_DEPOT_THREAD | KVS_DEPOT_MVCC)));
 
-#define kvs_assert_store(_store) \
-	kvs_assert(_store); \
-	kvs_assert((_store)->db)
-
 #define kvs_assert_xact(_xact) \
 	kvs_assert(_xact); \
 	kvs_assert((_xact)->txn)
