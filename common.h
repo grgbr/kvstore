@@ -78,6 +78,14 @@ kvs_get(const struct kvs_store *store,
         unsigned int            flags);
 
 extern int
+kvs_pget(const struct kvs_store *index,
+         const struct kvs_xact  *xact,
+         DBT                    *ikey,
+         DBT                    *pkey,
+         DBT                    *item,
+         unsigned int            flags);
+
+extern int
 kvs_put(const struct kvs_store *store,
         const struct kvs_xact  *xact,
         DBT                    *key,

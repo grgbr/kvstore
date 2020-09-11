@@ -39,6 +39,8 @@ int
 kvs_err_from_bdb(int err)
 {
 	switch (err) {
+	case DB_FOREIGN_CONFLICT:
+		return -EADDRINUSE;
 	case DB_NOTFOUND:
 		return -ENOENT;
 	case DB_KEYEXIST:
@@ -62,6 +64,8 @@ const char *
 kvs_strerror(int err)
 {
 	switch (err) {
+	case -EADDRINUSE:
+		return "Foreign key conflict";
 	case -ENOENT:
 		return "Key/data pair not found";
 	case -EEXIST:
@@ -441,6 +445,31 @@ kvs_get(const struct kvs_store *store,
 }
 
 int
+kvs_pget(const struct kvs_store *index,
+         const struct kvs_xact  *xact,
+         DBT                    *ikey,
+         DBT                    *pkey,
+         DBT                    *item,
+         unsigned int            flags)
+{
+	kvs_assert(index);
+	kvs_assert(index->db);
+	kvs_assert_xact(xact);
+	kvs_assert(ikey);
+	kvs_assert(ikey->data);
+	kvs_assert(ikey->size);
+	kvs_assert(pkey);
+	kvs_assert(item);
+
+	int ret;
+
+	ret = index->db->pget(index->db, xact->txn, ikey, pkey, item, flags);
+	kvs_assert(ret != EINVAL);
+
+	return kvs_err_from_bdb(ret);
+}
+
+int
 kvs_put(const struct kvs_store *store,
         const struct kvs_xact  *xact,
         DBT                    *key,
@@ -469,9 +498,11 @@ kvs_put(const struct kvs_store *store,
 	ret = store->db->put(store->db, xact->txn, key, item, flags);
 
 	/*
-	 * Note: will return EINVAL in case of violation of unique secondary
+	 * Note: BDB will return EINVAL in case of violation of unique secondary
 	 * index integrity contraint.
 	 */
+	if (ret == EINVAL)
+		return -EEXIST;
 
 	return kvs_err_from_bdb(ret);
 }
