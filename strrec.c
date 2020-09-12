@@ -117,6 +117,40 @@ kvs_strrec_get(const struct kvs_store  *store,
 	return item.size;
 }
 
+ssize_t
+kvs_strrec_get_byfield(const struct kvs_store  *index,
+                       const struct kvs_xact   *xact,
+                       struct kvs_chunk        *field,
+                       const char             **id,
+                       size_t                  *len,
+                       const void             **data)
+{
+	kvs_assert_chunk(field);
+	kvs_assert(id);
+	kvs_assert(data);
+
+	DBT ikey = { .data = (void *)field->data, .size = field->size, 0, };
+	DBT pkey = { 0, };
+	DBT item = { 0, };
+	int ret;
+
+	ret = kvs_pget(index, xact, &ikey, &pkey, &item, 0);
+	if (ret < 0)
+		return ret;
+
+	kvs_assert(pkey.data);
+	kvs_assert(pkey.size == DB_HEAP_RID_SZ);
+	kvs_assert(item.data);
+	kvs_assert(item.size);
+
+	*id = pkey.data;
+	*len = pkey.size;
+	*data = item.data;
+
+	return item.size;
+}
+
+
 int
 kvs_strrec_get_desc(const struct kvs_store  *store,
                     const struct kvs_xact   *xact,
@@ -184,6 +218,18 @@ kvs_strrec_del(const struct kvs_store *store,
 	DBT key = { .data = (void *)id, .size = len, 0 };
 
 	return kvs_del(store, xact, &key);
+}
+
+int
+kvs_strrec_del_byfield(const struct kvs_store *index,
+                       const struct kvs_xact  *xact,
+                       struct kvs_chunk       *field)
+{
+	kvs_assert_chunk(field);
+
+	DBT key = { .data = (void *)field->data, .size = field->size, 0, };
+
+	return kvs_del(index, xact, &key);
 }
 
 int

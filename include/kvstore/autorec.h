@@ -51,6 +51,13 @@ kvs_autorec_get(const struct kvs_store  *store,
                 struct kvs_autorec_id    id,
 	        const void             **data);
 
+extern ssize_t
+kvs_autorec_get_byfield(const struct kvs_store  *index,
+                        const struct kvs_xact   *xact,
+                        const struct kvs_chunk  *field,
+                        struct kvs_autorec_id   *id,
+                        const void             **data);
+
 extern int
 kvs_autorec_get_desc(const struct kvs_store  *store,
                      const struct kvs_xact   *xact,
@@ -75,6 +82,11 @@ extern int
 kvs_autorec_del(const struct kvs_store *store,
                 const struct kvs_xact  *xact,
                 struct kvs_autorec_id   id);
+
+extern int
+kvs_autorec_del_byfield(const struct kvs_store *index,
+                        const struct kvs_xact  *xact,
+                        const struct kvs_chunk *field);
 
 extern int
 kvs_autorec_open(struct kvs_store       *store,

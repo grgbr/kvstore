@@ -113,9 +113,43 @@ kvs_autorec_get(const struct kvs_store  *store,
 	if (item.size && !item.data)
 		return -EBADMSG;
 
-	kvs_assert(key.size == DB_HEAP_RID_SZ);
 	kvs_assert(!memcmp(key.data, &id.rid, DB_HEAP_RID_SZ));
+	kvs_assert(key.size == DB_HEAP_RID_SZ);
 
+	*data = item.data;
+
+	return item.size;
+}
+
+ssize_t
+kvs_autorec_get_byfield(const struct kvs_store  *index,
+                        const struct kvs_xact   *xact,
+                        const struct kvs_chunk  *field,
+                        struct kvs_autorec_id   *id,
+                        const void             **data)
+{
+	kvs_assert_chunk(field);
+	kvs_assert(id);
+	kvs_assert(data);
+
+	DBT ikey = { .data = (void *)field->data, .size = field->size, 0, };
+	DBT pkey = { 0, };
+	DBT item = { 0, };
+	int ret;
+
+	ret = kvs_pget(index, xact, &ikey, &pkey, &item, 0);
+	if (ret < 0)
+		return ret;
+
+	if (item.size && !item.data)
+		return -EBADMSG;
+
+	kvs_assert(pkey.data);
+	kvs_assert(pkey.size == DB_HEAP_RID_SZ);
+	kvs_assert(item.data);
+	kvs_assert(item.size);
+
+	memcpy(&id->rid, pkey.data, DB_HEAP_RID_SZ);
 	*data = item.data;
 
 	return item.size;
@@ -193,6 +227,18 @@ kvs_autorec_del(const struct kvs_store *store,
 	DBT key = { .data = (void *)&id.rid, .size = DB_HEAP_RID_SZ, 0, };
 
 	return kvs_del(store, xact, &key);
+}
+
+int
+kvs_autorec_del_byfield(const struct kvs_store *index,
+                        const struct kvs_xact  *xact,
+                        const struct kvs_chunk *field)
+{
+	kvs_assert_chunk(field);
+
+	DBT key = { .data = (void *)field->data, .size = field->size, 0, };
+
+	return kvs_del(index, xact, &key);
 }
 
 int

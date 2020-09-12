@@ -40,6 +40,14 @@ kvs_strrec_get(const struct kvs_store *store,
 	       size_t                  len,
 	       const void            **data);
 
+extern ssize_t
+kvs_strrec_get_byfield(const struct kvs_store  *index,
+                       const struct kvs_xact   *xact,
+                       struct kvs_chunk        *field,
+                       const char             **id,
+                       size_t                  *len,
+                       const void             **data);
+
 extern int
 kvs_strrec_get_desc(const struct kvs_store  *store,
                     const struct kvs_xact   *xact,
@@ -68,6 +76,11 @@ kvs_strrec_del(const struct kvs_store *store,
                const struct kvs_xact  *xact,
 	       const char             *id,
 	       size_t                  len);
+
+extern int
+kvs_strrec_del_byfield(const struct kvs_store *index,
+                       const struct kvs_xact  *xact,
+                       struct kvs_chunk       *field);
 
 extern int
 kvs_strrec_open(struct kvs_store       *store,

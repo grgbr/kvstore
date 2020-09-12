@@ -30,6 +30,11 @@ kvs_env_dbg(DB_ENV *env __unused, const char *fmt __unused, ...)
 	kvs_assert(_xact); \
 	kvs_assert((_xact)->txn)
 
+#define kvs_assert_chunk(_chunk) \
+	kvs_assert(_chunk); \
+	kvs_assert((_chunk)->size); \
+	kvs_assert((_chunk)->data);
+
 #define KVS_STR_MAX (4096U)
 
 extern int

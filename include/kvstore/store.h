@@ -87,6 +87,11 @@ kvs_commit_xact(const struct kvs_xact *xact);
  * Data store / index handling.
  ******************************************************************************/
 
+struct kvs_chunk {
+	size_t      size;
+	const void *data;
+};
+
 struct kvs_iter {
 	DBC *curs;
 };
