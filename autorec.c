@@ -1,80 +1,97 @@
 #include "common.h"
 #include <kvstore/autorec.h>
 #include <string.h>
+#include <errno.h>
 
-/*
- * Definition of THE invalid automatic identifier.
- * Watch out ! BDB stores heap IDs in a packed manner, which
- * struct kvs_autorec_id is not.
- * We could perform assignments / comparisons using internal fields of the
- * DB_HEAP_RID typedef (struct __db_heap_rid). For portability / sustainability
- * purposes this is not the way it is implemented however.
- * Hence the memcmp that may be found at various places throughout this file.
- */
-const struct kvs_autorec_id kvs_autorec_none = { .rid = { 0, } };
+#define KVS_AUTOREC_INIT_RID(_id) \
+	{ \
+		.pgno = (uint64_t)(_id) >> \
+		        (sizeof_member(DB_HEAP_RID, indx) * CHAR_BIT), \
+		.indx = (uint64_t)(_id) & \
+		        ((1U << \
+		          (sizeof_member(DB_HEAP_RID, indx) * CHAR_BIT)) - 1) \
+	}
 
-#define kvs_autorec_assert_desc(_desc) \
-	kvs_assert((_desc)->data || !(_desc)->size)
+#define KVS_AUTOREC_INIT_KEY(_rid) \
+	{ \
+		.data = _rid, \
+		.size = DB_HEAP_RID_SZ, \
+		0, \
+	}
 
-bool
-kvs_autorec_id_isok(struct kvs_autorec_id id)
+static uint64_t
+kvs_autorec_key_to_id(const DBT *key)
 {
-	return memcmp(&id.rid, &kvs_autorec_none.rid, DB_HEAP_RID_SZ);
-}
-
-static int
-kvs_autorec_fill_desc(const DBT               *key,
-                      const DBT               *item,
-                      struct kvs_autorec_desc *desc)
-{
+	kvs_assert(key);
 	kvs_assert(key->data);
 	kvs_assert(key->size == DB_HEAP_RID_SZ);
-	kvs_assert(memcmp(key->data, &kvs_autorec_none.rid, DB_HEAP_RID_SZ));
+
+	const DB_HEAP_RID *rid = key->data;
+
+	kvs_assert(rid->pgno);
+
+	/*
+	 * Watch out ! BDB stores heap IDs in a packed manner, which DB_HEAP_RID
+	 * typedef is not.
+	 * This is the reason why we perform assignments using DB_HEAP_RID's
+	 * internal fields.
+	 */
+	return (uint64_t)(rid->pgno << (sizeof(rid->indx) * CHAR_BIT)) |
+	       (uint64_t)rid->indx;
+}
+
+static void
+kvs_autorec_fill_rec(const DBT        *key,
+                     uint64_t         *id,
+                     const DBT        *itm,
+                     struct kvs_chunk *item)
+{
+	kvs_assert(key);
+	kvs_assert(id);
+	kvs_assert(itm);
+	kvs_assert(itm->data || !itm->size);
 	kvs_assert(item);
-	kvs_assert(desc);
 
-	if (item->size && !item->data)
-		return -EBADMSG;
+	*id = kvs_autorec_key_to_id(key);
 
-	memcpy(&desc->id.rid, key->data, DB_HEAP_RID_SZ);
-	desc->data = item->data;
-	desc->size = item->size;
+	item->data = itm->data;
+	item->size = itm->size;
+}
+
+int
+kvs_autorec_iter_first(const struct kvs_iter *iter,
+                       uint64_t              *id,
+                       struct kvs_chunk      *item)
+{
+	DBT key = { 0, };
+	DBT itm = { 0, };
+	int err;
+
+	err = kvs_iter_goto_first(iter, &key, &itm);
+	if (err)
+		return err;
+
+	kvs_autorec_fill_rec(&key, id, &itm, item);
 
 	return 0;
 }
 
 int
-kvs_autorec_iter_first(const struct kvs_iter   *iter,
-                       struct kvs_autorec_desc *desc)
+kvs_autorec_iter_next(const struct kvs_iter *iter,
+                      uint64_t              *id,
+                      struct kvs_chunk      *item)
 {
-	kvs_assert(desc);
-
 	DBT key = { 0, };
-	DBT item = { 0, };
+	DBT itm = { 0, };
 	int err;
 
-	err = kvs_iter_goto_first(iter, &key, &item);
+	err = kvs_iter_goto_next(iter, &key, &itm);
 	if (err)
 		return err;
 
-	return kvs_autorec_fill_desc(&key, &item, desc);
-}
+	kvs_autorec_fill_rec(&key, id, &itm, item);
 
-int
-kvs_autorec_iter_next(const struct kvs_iter   *iter,
-                      struct kvs_autorec_desc *desc)
-{
-	kvs_assert(desc);
-
-	DBT key = { 0, };
-	DBT item = { 0, };
-	int err;
-
-	err = kvs_iter_goto_next(iter, &key, &item);
-	if (err)
-		return err;
-
-	return kvs_autorec_fill_desc(&key, &item, desc);
+	return 0;
 }
 
 int
@@ -91,86 +108,86 @@ kvs_autorec_fini_iter(const struct kvs_iter *iter)
 	return kvs_fini_iter(iter);
 }
 
-ssize_t
-kvs_autorec_get(const struct kvs_store  *store,
-                const struct kvs_xact   *xact,
-                struct kvs_autorec_id    id,
-                const void             **data)
+int
+kvs_autorec_get_byid(const struct kvs_store *store,
+                     const struct kvs_xact  *xact,
+                     uint64_t                id,
+                     struct kvs_chunk       *item)
 {
 	kvs_assert(kvs_autorec_id_isok(id));
-	kvs_assert(data);
+	kvs_assert(item);
 
-	DBT key = { .data = (void *)&id.rid, .size = DB_HEAP_RID_SZ, 0, };
-	DBT item = { 0 };
-	int ret;
+	DB_HEAP_RID rid = KVS_AUTOREC_INIT_RID(id);
+	DBT         key = KVS_AUTOREC_INIT_KEY(&rid);
+	DBT         itm = { 0 };
+	int         ret;
 
-	ret = kvs_get(store, xact, &key, &item, 0);
+	ret = kvs_get(store, xact, &key, &itm, 0);
 	kvs_assert(ret != -EXDEV);
 
 	if (ret < 0)
 		return ret;
 
-	if (item.size && !item.data)
-		return -EBADMSG;
-
-	kvs_assert(!memcmp(key.data, &id.rid, DB_HEAP_RID_SZ));
 	kvs_assert(key.size == DB_HEAP_RID_SZ);
+	kvs_assert(!memcmp(key.data, &rid, DB_HEAP_RID_SZ));
+	kvs_assert(itm.data || !itm.size);
 
-	*data = item.data;
+	item->size = itm.size;
+	item->data = itm.data;
 
-	return item.size;
-}
-
-ssize_t
-kvs_autorec_get_byfield(const struct kvs_store  *index,
-                        const struct kvs_xact   *xact,
-                        const struct kvs_chunk  *field,
-                        struct kvs_autorec_id   *id,
-                        const void             **data)
-{
-	kvs_assert_chunk(field);
-	kvs_assert(id);
-	kvs_assert(data);
-
-	DBT ikey = { .data = (void *)field->data, .size = field->size, 0, };
-	DBT pkey = { 0, };
-	DBT item = { 0, };
-	int ret;
-
-	ret = kvs_pget(index, xact, &ikey, &pkey, &item, 0);
-	if (ret < 0)
-		return ret;
-
-	if (item.size && !item.data)
-		return -EBADMSG;
-
-	kvs_assert(pkey.data);
-	kvs_assert(pkey.size == DB_HEAP_RID_SZ);
-	kvs_assert(item.data);
-	kvs_assert(item.size);
-
-	memcpy(&id->rid, pkey.data, DB_HEAP_RID_SZ);
-	*data = item.data;
-
-	return item.size;
+	return 0;
 }
 
 int
-kvs_autorec_get_desc(const struct kvs_store  *store,
-                     const struct kvs_xact   *xact,
-                     struct kvs_autorec_id    id,
-                     struct kvs_autorec_desc *desc)
+kvs_autorec_get_byfield(const struct kvs_store *index,
+                        const struct kvs_xact  *xact,
+                        const struct kvs_chunk *field,
+                        uint64_t               *id,
+                        struct kvs_chunk       *item)
 {
-	kvs_assert(desc);
+	kvs_assert(index);
+	kvs_assert(index->db);
+	kvs_assert(index->db->app_private);
+	kvs_assert(id);
+	kvs_assert(item);
 
+	DBT ikey = KVS_CHUNK_INIT_DBT(field);
+	DBT pkey = { 0, };
+	DBT itm = { 0, };
 	int ret;
 
-	ret = kvs_autorec_get(store, xact, id, &desc->data);
+	ret = kvs_pget(index, xact, &ikey, &pkey, &itm, 0);
 	if (ret < 0)
 		return ret;
 
-	desc->id = id;
-	desc->size = (size_t)ret;
+	*id = kvs_autorec_key_to_id(&pkey);
+
+	kvs_assert(itm.data);
+	kvs_assert(itm.size);
+	item->size = itm.size;
+	item->data = itm.data;
+
+	return 0;
+}
+
+int
+kvs_autorec_add(const struct kvs_store *store,
+                const struct kvs_xact  *xact,
+                uint64_t               *id,
+                const struct kvs_chunk *item)
+{
+	kvs_assert(id);
+	kvs_assert(item);
+
+	DBT key = { 0, };
+	DBT itm = KVS_CHUNK_INIT_DBT(item);
+	int ret;
+
+	ret = kvs_put(store, xact, &key, &itm, DB_APPEND);
+	if (ret)
+		return ret;
+
+	*id = kvs_autorec_key_to_id(&key);
 
 	return 0;
 }
@@ -178,53 +195,28 @@ kvs_autorec_get_desc(const struct kvs_store  *store,
 int
 kvs_autorec_update(const struct kvs_store *store,
                    const struct kvs_xact  *xact,
-                   struct kvs_autorec_id   id,
-                   const void             *data,
-                   size_t                  size)
+                   uint64_t                id,
+                   const struct kvs_chunk *item)
 {
 	kvs_assert(kvs_autorec_id_isok(id));
-	kvs_assert(data || !size);
+	kvs_assert(item);
 
-	DBT key = { .data = (void *)&id.rid, .size = DB_HEAP_RID_SZ, 0, };
-	DBT item = { .data = (void *)data, .size = size, 0 };
+	DB_HEAP_RID rid = KVS_AUTOREC_INIT_RID(id);
+	DBT         key = KVS_AUTOREC_INIT_KEY(&rid);
+	DBT         itm = KVS_CHUNK_INIT_DBT(item);
 
-	return kvs_put(store, xact, &key, &item, 0);
+	return kvs_put(store, xact, &key, &itm, 0);
 }
 
 int
-kvs_autorec_add(const struct kvs_store *store,
-                const struct kvs_xact  *xact,
-                struct kvs_autorec_id  *id,
-                const void             *data,
-                size_t                  size)
-{
-	kvs_assert(id);
-	kvs_assert(data || !size);
-
-	DBT key = { 0, };
-	DBT item = { .data = (void *)data, .size = size, 0, };
-	int ret;
-
-	ret = kvs_put(store, xact, &key, &item, DB_APPEND);
-	if (ret)
-		return ret;
-
-	kvs_assert(key.data);
-	kvs_assert(key.size == DB_HEAP_RID_SZ);
-
-	memcpy(&id->rid, key.data, DB_HEAP_RID_SZ);
-
-	return 0;
-}
-
-int
-kvs_autorec_del(const struct kvs_store *store,
-                const struct kvs_xact  *xact,
-                struct kvs_autorec_id   id)
+kvs_autorec_del_byid(const struct kvs_store *store,
+                     const struct kvs_xact  *xact,
+                     uint64_t                id)
 {
 	kvs_assert(kvs_autorec_id_isok(id));
 
-	DBT key = { .data = (void *)&id.rid, .size = DB_HEAP_RID_SZ, 0, };
+	DB_HEAP_RID rid = KVS_AUTOREC_INIT_RID(id);
+	DBT         key = KVS_AUTOREC_INIT_KEY(&rid);
 
 	return kvs_del(store, xact, &key);
 }
@@ -234,9 +226,12 @@ kvs_autorec_del_byfield(const struct kvs_store *index,
                         const struct kvs_xact  *xact,
                         const struct kvs_chunk *field)
 {
-	kvs_assert_chunk(field);
+	kvs_assert(index);
+	kvs_assert(index->db);
+	kvs_assert(index->db->app_private);
+	kvs_assert(field);
 
-	DBT key = { .data = (void *)field->data, .size = field->size, 0, };
+	DBT key = KVS_CHUNK_INIT_DBT(field);
 
 	return kvs_del(index, xact, &key);
 }

@@ -605,36 +605,35 @@ kvs_close_store(const struct kvs_store *store)
 }
 
 static int
-kvs_bind_index(DB *index, const DBT *pkey, const DBT *pitem, DBT *skey)
+kvs_bind_index(DB *index, const DBT *pkey, const DBT *item, DBT *skey)
 {
 	kvs_assert(index);
 	kvs_assert(index->app_private);
 	kvs_assert(pkey);
 	kvs_assert(pkey->data);
 	kvs_assert(pkey->size);
-	kvs_assert(pitem);
+	kvs_assert(item);
+	kvs_assert(item->data);
+	kvs_assert(item->size);
 	kvs_assert(skey);
 
-	kvs_bind_index_fn *bind = index->app_private;
-	ssize_t            ret;
+	kvs_bind_index_fn      *bind = index->app_private;
+	const struct kvs_chunk  pk = { .size = pkey->size, .data = pkey->data };
+	const struct kvs_chunk  itm = { .size = item->size, .data = item->data };
+	struct kvs_chunk        sk;
+	ssize_t                 ret;
 
-	if (!pitem->size)
-		return -EMSGSIZE;
+	ret = bind(&pk, &itm, &sk);
+	if (ret < 0)
+		return ret;
 
-	if (!pitem->data)
-		return -ENODATA;
+	if (!sk.size)
+		return DB_DONOTINDEX;
 
-	ret = bind(pkey->data,
-	           pkey->size,
-	           pitem->data,
-	           pitem->size,
-	           &skey->data);
-	if (ret <= 0)
-		return (!ret) ? DB_DONOTINDEX : ret;
+	kvs_assert(sk.data);
 
-	kvs_assert(skey->data);
-
-	skey->size = (size_t)ret;
+	skey->data = (void *)sk.data;
+	skey->size = sk.size;
 
 	return 0;
 }

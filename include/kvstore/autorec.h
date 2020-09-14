@@ -3,39 +3,30 @@
 
 #include <kvstore/store.h>
 #include <stdbool.h>
-#include <stdint.h>
-#include <sys/types.h>
-#include <errno.h>
 
 /******************************************************************************
- * Automatic index store / iterator handling
+ * Automatic primary keyed record store handling
  ******************************************************************************/
 
-struct kvs_autorec_id {
-	DB_HEAP_RID rid;
-};
+#define KVS_AUTOREC_MAX_ID \
+	((uint64_t)1 << ((sizeof_member(DB_HEAP_RID, pgno) + \
+	                  sizeof_member(DB_HEAP_RID, indx)) * CHAR_BIT))
 
-extern const struct kvs_autorec_id kvs_autorec_none;
-
-#define KVS_AUTOREC_NONE \
-	kvs_autorec_none
-
-extern bool
-kvs_autorec_id_isok(struct kvs_autorec_id id);
-
-struct kvs_autorec_desc {
-	struct kvs_autorec_id  id;
-	const void            *data;
-	size_t                 size;
-};
+static inline bool
+kvs_autorec_id_isok(uint64_t id)
+{
+	return (id > 0) && (id < KVS_AUTOREC_MAX_ID);
+}
 
 extern int
-kvs_autorec_iter_first(const struct kvs_iter  *iter,
-                       struct kvs_autorec_desc *desc);
+kvs_autorec_iter_first(const struct kvs_iter *iter,
+                       uint64_t              *id,
+                       struct kvs_chunk      *item);
 
 extern int
-kvs_autorec_iter_next(const struct kvs_iter   *iter,
-                      struct kvs_autorec_desc *desc);
+kvs_autorec_iter_next(const struct kvs_iter *iter,
+                      uint64_t              *id,
+                      struct kvs_chunk      *item);
 
 extern int
 kvs_autorec_init_iter(const struct kvs_store *store,
@@ -45,43 +36,35 @@ kvs_autorec_init_iter(const struct kvs_store *store,
 extern int
 kvs_autorec_fini_iter(const struct kvs_iter *iter);
 
-extern ssize_t
-kvs_autorec_get(const struct kvs_store  *store,
-                const struct kvs_xact   *xact,
-                struct kvs_autorec_id    id,
-	        const void             **data);
-
-extern ssize_t
-kvs_autorec_get_byfield(const struct kvs_store  *index,
-                        const struct kvs_xact   *xact,
-                        const struct kvs_chunk  *field,
-                        struct kvs_autorec_id   *id,
-                        const void             **data);
+extern int
+kvs_autorec_get_byid(const struct kvs_store *store,
+                     const struct kvs_xact  *xact,
+                     uint64_t                id,
+                     struct kvs_chunk       *item);
 
 extern int
-kvs_autorec_get_desc(const struct kvs_store  *store,
-                     const struct kvs_xact   *xact,
-                     struct kvs_autorec_id    id,
-                     struct kvs_autorec_desc *desc);
-
-extern int
-kvs_autorec_update(const struct kvs_store *store,
-                   const struct kvs_xact  *xact,
-                   struct kvs_autorec_id   id,
-                   const void             *data,
-                   size_t                  size);
+kvs_autorec_get_byfield(const struct kvs_store *index,
+                        const struct kvs_xact  *xact,
+                        const struct kvs_chunk *field,
+                        uint64_t               *id,
+                        struct kvs_chunk       *item);
 
 extern int
 kvs_autorec_add(const struct kvs_store *store,
                 const struct kvs_xact  *xact,
-                struct kvs_autorec_id  *id,
-	        const void             *data,
-	        size_t                  size);
+                uint64_t               *id,
+                const struct kvs_chunk *item);
 
 extern int
-kvs_autorec_del(const struct kvs_store *store,
-                const struct kvs_xact  *xact,
-                struct kvs_autorec_id   id);
+kvs_autorec_update(const struct kvs_store *store,
+                   const struct kvs_xact  *xact,
+                   uint64_t                id,
+                   const struct kvs_chunk *item);
+
+extern int
+kvs_autorec_del_byid(const struct kvs_store *store,
+                     const struct kvs_xact  *xact,
+                     uint64_t                id);
 
 extern int
 kvs_autorec_del_byfield(const struct kvs_store *index,

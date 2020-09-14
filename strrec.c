@@ -1,69 +1,73 @@
 #include "common.h"
 #include <kvstore/strrec.h>
-#include <string.h>
+#include <utils/string.h>
 
-#define kvs_strrec_assert_desc(_desc) \
-	kvs_assert(_desc); \
-	kvs_assert((_desc)->id); \
-	kvs_assert(*(_desc)->id); \
-	kvs_assert((_desc)->len); \
-	kvs_assert((_desc)->len < KVS_STR_MAX); \
-	kvs_assert(!!(_desc)->data ^ !! kvs_assert((_desc)->size))
+#define kvs_strrec_assert_id(_id) \
+	kvs_assert(_id); \
+	kvs_assert((_id)->data); \
+	kvs_assert(ustr_parse((_id)->data, KVS_STR_MAX) == (ssize_t)(_id)->size)
 
-static int
-kvs_strrec_fill_desc(const DBT              *key,
-                     const DBT              *item,
-                     struct kvs_strrec_desc *desc)
+#define KVS_STRREC_INIT_KEY(_id) \
+	{ \
+		.data = (void *)(_id)->data, \
+		.size = (_id)->size, \
+		0, \
+	}
+
+static void
+kvs_strrec_fill_rec(const DBT        *key,
+                    struct kvs_chunk *id,
+                    const DBT        *itm,
+                    struct kvs_chunk *item)
 {
-	kvs_assert(key->data);
-	kvs_assert(key->size);
+	kvs_assert(key);
+	kvs_assert(id);
+	kvs_assert(itm);
+	kvs_assert(itm->data || !itm->size);
 	kvs_assert(item);
-	kvs_assert(desc);
 
-	if (!((char *)key->data)[0] || (key->size >= KVS_STR_MAX))
-		return -EKEYREJECTED;
+	id->size = key->size;
+	id->data = key->data;
+	kvs_strrec_assert_id(id);
 
-	if (!(!!item->data ^ !!item->size))
-		return -EBADMSG;
+	item->data = itm->data;
+	item->size = itm->size;
+}
 
-	desc->id = (char *)key->data;
-	desc->len = key->size;
-	desc->data = item->data;
-	desc->size = item->size;
+int
+kvs_strrec_iter_first(const struct kvs_iter *iter,
+                      struct kvs_chunk      *id,
+                      struct kvs_chunk      *item)
+{
+	DBT key = { 0, };
+	DBT itm = { 0, };
+	int err;
+
+	err = kvs_iter_goto_first(iter, &key, &itm);
+	if (err)
+		return err;
+
+	kvs_strrec_fill_rec(&key, id, &itm, item);
 
 	return 0;
 }
 
 int
-kvs_strrec_iter_first(const struct kvs_iter *iter, struct kvs_strrec_desc *desc)
+kvs_strrec_iter_next(const struct kvs_iter *iter,
+                     struct kvs_chunk      *id,
+                     struct kvs_chunk      *item)
 {
-	kvs_assert(desc);
-
 	DBT key = { 0, };
-	DBT item = { 0, };
+	DBT itm = { 0, };
 	int err;
 
-	err = kvs_iter_goto_first(iter, &key, &item);
+	err = kvs_iter_goto_next(iter, &key, &itm);
 	if (err)
 		return err;
 
-	return kvs_strrec_fill_desc(&key, &item, desc);
-}
+	kvs_strrec_fill_rec(&key, id, &itm, item);
 
-int
-kvs_strrec_iter_next(const struct kvs_iter *iter, struct kvs_strrec_desc *desc)
-{
-	kvs_assert(desc);
-
-	DBT key = { 0, };
-	DBT item = { 0, };
-	int err;
-
-	err = kvs_iter_goto_next(iter, &key, &item);
-	if (err)
-		return err;
-
-	return kvs_strrec_fill_desc(&key, &item, desc);
+	return 0;
 }
 
 int
@@ -80,142 +84,107 @@ kvs_strrec_fini_iter(const struct kvs_iter *iter)
 	return kvs_fini_iter(iter);
 }
 
-#define kvs_strrec_assert_id(_id, _len) \
-	kvs_assert(_id); \
-	kvs_assert(*(_id)); \
-	kvs_assert(_len); \
-	kvs_assert((_len) < KVS_STR_MAX)
-
-ssize_t
-kvs_strrec_get(const struct kvs_store  *store,
-               const struct kvs_xact   *xact,
-               const char              *id,
-               size_t                   len,
-               const void             **data)
+int
+kvs_strrec_get_byid(const struct kvs_store *store,
+                    const struct kvs_xact  *xact,
+                    const struct kvs_chunk *id,
+                    struct kvs_chunk       *item)
 {
-	kvs_strrec_assert_id(id, len);
-	kvs_assert(data);
+	kvs_strrec_assert_id(id);
+	kvs_assert(item);
 
-	DBT key = { .data = (void *)id, .size = len, 0 };
-	DBT item = { 0 };
+	DBT key = KVS_STRREC_INIT_KEY(id);
+	DBT itm = { 0 };
 	int ret;
 
-	ret = kvs_get(store, xact, &key, &item, 0);
+	ret = kvs_get(store, xact, &key, &itm, 0);
 	kvs_assert(ret != -EXDEV);
 
 	if (ret < 0)
 		return ret;
 
-	if (!(!!item.data ^ !!item.size))
-		return -EBADMSG;
+	kvs_assert(!memcmp(key.data, id->data, key.size));
+	kvs_assert(key.size == id->size);
 
-	kvs_assert(key.size == len);
-	kvs_assert(!memcmp(key.data, id, len));
-
-	*data = item.data;
-
-	return item.size;
-}
-
-ssize_t
-kvs_strrec_get_byfield(const struct kvs_store  *index,
-                       const struct kvs_xact   *xact,
-                       struct kvs_chunk        *field,
-                       const char             **id,
-                       size_t                  *len,
-                       const void             **data)
-{
-	kvs_assert_chunk(field);
-	kvs_assert(id);
-	kvs_assert(data);
-
-	DBT ikey = { .data = (void *)field->data, .size = field->size, 0, };
-	DBT pkey = { 0, };
-	DBT item = { 0, };
-	int ret;
-
-	ret = kvs_pget(index, xact, &ikey, &pkey, &item, 0);
-	if (ret < 0)
-		return ret;
-
-	kvs_assert(pkey.data);
-	kvs_assert(pkey.size == DB_HEAP_RID_SZ);
-	kvs_assert(item.data);
-	kvs_assert(item.size);
-
-	*id = pkey.data;
-	*len = pkey.size;
-	*data = item.data;
-
-	return item.size;
-}
-
-
-int
-kvs_strrec_get_desc(const struct kvs_store  *store,
-                    const struct kvs_xact   *xact,
-                    const char              *id,
-                    size_t                   len,
-                    struct kvs_strrec_desc  *desc)
-{
-	kvs_assert(desc);
-
-	int ret;
-
-	ret = kvs_strrec_get(store, xact, id, len, &desc->data);
-	if (ret < 0)
-		return ret;
-
-	desc->id = id;
-	desc->len = len;
-	desc->size = (size_t)ret;
+	item->size = itm.size;
+	item->data = itm.data;
 
 	return 0;
 }
 
 int
-kvs_strrec_put(const struct kvs_store *store,
-               const struct kvs_xact  *xact,
-               const char             *id,
-               size_t                  len,
-               const void             *data,
-               size_t                  size)
+kvs_strrec_get_byfield(const struct kvs_store *index,
+                       const struct kvs_xact  *xact,
+                       const struct kvs_chunk *field,
+                       struct kvs_chunk       *id,
+                       struct kvs_chunk       *item)
 {
-	kvs_strrec_assert_id(id, len);
-	kvs_assert(!!data ^ !!size);
+	kvs_assert(index);
+	kvs_assert(index->db);
+	kvs_assert(index->db->app_private);
+	kvs_assert(field);
+	kvs_assert(id);
+	kvs_assert(item);
 
-	DBT key = { .data = (void *)id, .size = len, 0 };
-	DBT item = { .data = (void *)data, .size = size, 0 };
+	DBT ikey = KVS_CHUNK_INIT_DBT(field);
+	DBT pkey = { 0, };
+	DBT itm = { 0, };
+	int ret;
 
-	return kvs_put(store, xact, &key, &item, 0);
+	ret = kvs_pget(index, xact, &ikey, &pkey, &itm, 0);
+	if (ret < 0)
+		return ret;
+
+	id->size = pkey.size;
+	id->data = pkey.data;
+	kvs_strrec_assert_id(id);
+
+	kvs_assert(itm.data);
+	kvs_assert(itm.size);
+	item->size = itm.size;
+	item->data = itm.data;
+
+	return 0;
 }
 
 int
 kvs_strrec_add(const struct kvs_store *store,
                const struct kvs_xact  *xact,
-               const char             *id,
-               size_t                  len,
-               const void             *data,
-               size_t                  size)
+               const struct kvs_chunk *id,
+               const struct kvs_chunk *item)
 {
-	kvs_strrec_assert_id(id, len);
-	kvs_assert(!!data ^ !!size);
+	kvs_strrec_assert_id(id);
+	kvs_assert(item);
 
-	DBT key = { .data = (void *)id, .size = len, 0 };
-	DBT item = { .data = (void *)data, .size = size, 0 };
+	DBT key = KVS_STRREC_INIT_KEY(id);
+	DBT itm = KVS_CHUNK_INIT_DBT(item);
 
-	return kvs_put(store, xact, &key, &item, DB_NOOVERWRITE);
+	return kvs_put(store, xact, &key, &itm, DB_NOOVERWRITE);
 }
 
 int
-kvs_strrec_del(const struct kvs_store *store,
+kvs_strrec_put(const struct kvs_store *store,
                const struct kvs_xact  *xact,
-               const char             *id,
-               size_t                  len)
+               const struct kvs_chunk *id,
+               const struct kvs_chunk *item)
 {
-	kvs_strrec_assert_id(id, len);
+	kvs_strrec_assert_id(id);
+	kvs_assert(item);
 
-	DBT key = { .data = (void *)id, .size = len, 0 };
+	DBT key = KVS_STRREC_INIT_KEY(id);
+	DBT itm = KVS_CHUNK_INIT_DBT(item);
+
+	return kvs_put(store, xact, &key, &itm, 0);
+}
+
+int
+kvs_strrec_del_byid(const struct kvs_store *store,
+                    const struct kvs_xact  *xact,
+                    const struct kvs_chunk *id)
+{
+	kvs_strrec_assert_id(id);
+
+	DBT key = KVS_STRREC_INIT_KEY(id);
 
 	return kvs_del(store, xact, &key);
 }
@@ -223,11 +192,14 @@ kvs_strrec_del(const struct kvs_store *store,
 int
 kvs_strrec_del_byfield(const struct kvs_store *index,
                        const struct kvs_xact  *xact,
-                       struct kvs_chunk       *field)
+                       const struct kvs_chunk *field)
 {
-	kvs_assert_chunk(field);
+	kvs_assert(index);
+	kvs_assert(index->db);
+	kvs_assert(index->db->app_private);
+	kvs_assert(field);
 
-	DBT key = { .data = (void *)field->data, .size = field->size, 0, };
+	DBT key = KVS_CHUNK_INIT_DBT(field);
 
 	return kvs_del(index, xact, &key);
 }

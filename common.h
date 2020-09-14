@@ -30,11 +30,6 @@ kvs_env_dbg(DB_ENV *env __unused, const char *fmt __unused, ...)
 	kvs_assert(_xact); \
 	kvs_assert((_xact)->txn)
 
-#define kvs_assert_chunk(_chunk) \
-	kvs_assert(_chunk); \
-	kvs_assert((_chunk)->size); \
-	kvs_assert((_chunk)->data);
-
 #define KVS_STR_MAX (4096U)
 
 extern int
@@ -54,6 +49,13 @@ extern ssize_t
 kvs_serialize_strpile(const struct upile *pile, void **data);
 
 #endif /* defined(CONFIG_KVSTORE_TYPE_STRPILE) */
+
+#define KVS_CHUNK_INIT_DBT(_chunk) \
+	{ \
+		.data = (void *)(_chunk)->data, \
+		.size = (_chunk)->size, \
+		0, \
+	}
 
 extern int
 kvs_iter_goto_first(const struct kvs_iter *iter, DBT *key, DBT *item);

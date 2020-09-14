@@ -100,11 +100,9 @@ struct kvs_store {
 	DB *db;
 };
 
-typedef ssize_t (kvs_bind_index_fn)(const void  *pkey_data,
-                                    size_t       pkey_size,
-                                    const void  *pitem_data,
-                                    size_t       pitem_size,
-                                    void       **skey_data);
+typedef int (kvs_bind_index_fn)(const struct kvs_chunk *pkey,
+                                const struct kvs_chunk *item,
+                                struct kvs_chunk       *skey);
 
 extern int
 kvs_open_index(struct kvs_store       *index,
