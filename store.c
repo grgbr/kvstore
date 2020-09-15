@@ -560,6 +560,9 @@ kvs_open_store(struct kvs_store       *store,
 		return kvs_err_from_bdb(err);
 	}
 
+	err = store->db->set_flags(store->db, DB_CHKSUM);
+	kvs_assert(!err);
+
 	err = store->db->open(store->db,
 	                      xact ? xact->txn : NULL,
 	                      path,
@@ -568,7 +571,6 @@ kvs_open_store(struct kvs_store       *store,
 	                      (xact ? 0 : DB_AUTO_COMMIT) | DB_CREATE |
 	                      depot->flags,
 	                      mode);
-	kvs_assert(err != EINVAL);
 	kvs_assert(err != DB_REP_HANDLE_DEAD);
 	kvs_assert(err != DB_REP_LOCKOUT);
 
@@ -774,6 +776,12 @@ kvs_open_depot(struct kvs_depot *depot,
 
 	depot->flags = flags & (KVS_DEPOT_THREAD | KVS_DEPOT_MVCC);
 
+	/*
+	 * Unsupported while opening depot itself. Will be used at store opening
+	 * time through the use of depot->flags.
+	 */
+	flags &= ~KVS_DEPOT_MVCC;
+
 	if (!(flags & KVS_DEPOT_PRIV)) {
 		/*
 		 * Generate a unique system wide System V IPC key for using
@@ -814,7 +822,6 @@ kvs_open_depot(struct kvs_depot *depot,
 	                       DB_CREATE |
 	                       flags,
 	                       mode & ~(S_IXUSR | S_IXGRP | S_IXOTH));
-	kvs_assert(err != DB_RUNRECOVERY);
 	kvs_assert(err != EINVAL);
 	if (err)
 		/*
