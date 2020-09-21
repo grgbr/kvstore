@@ -343,6 +343,27 @@ kvs_commit_xact(const struct kvs_xact *xact)
 	return kvs_err_from_bdb(ret);
 }
 
+int
+kvs_end_xact(const struct kvs_xact *xact, int status)
+{
+	kvs_assert_xact(xact);
+
+	if (status) {
+		int ret;
+
+		if (status == -ENOTRECOVERABLE)
+			return -ENOTRECOVERABLE;
+
+		ret = kvs_rollback_xact(xact);
+		if (ret == -ENOTRECOVERABLE)
+			return -ENOTRECOVERABLE;
+
+		return status;
+	}
+
+	return kvs_commit_xact(xact);
+}
+
 #define kvs_assert_iter(_iter) \
 	kvs_assert(_iter); \
 	kvs_assert(&(_iter)->curs)
@@ -445,15 +466,15 @@ kvs_get(const struct kvs_store *store,
 }
 
 int
-kvs_pget(const struct kvs_store *index,
+kvs_pget(const struct kvs_store *indx,
          const struct kvs_xact  *xact,
          DBT                    *ikey,
          DBT                    *pkey,
          DBT                    *item,
          unsigned int            flags)
 {
-	kvs_assert(index);
-	kvs_assert(index->db);
+	kvs_assert(indx);
+	kvs_assert(indx->db);
 	kvs_assert_xact(xact);
 	kvs_assert(ikey);
 	kvs_assert(ikey->data);
@@ -463,7 +484,7 @@ kvs_pget(const struct kvs_store *index,
 
 	int ret;
 
-	ret = index->db->pget(index->db, xact->txn, ikey, pkey, item, flags);
+	ret = indx->db->pget(indx->db, xact->txn, ikey, pkey, item, flags);
 	kvs_assert(ret != EINVAL);
 
 	return kvs_err_from_bdb(ret);
@@ -607,10 +628,10 @@ kvs_close_store(const struct kvs_store *store)
 }
 
 static int
-kvs_bind_index(DB *index, const DBT *pkey, const DBT *item, DBT *skey)
+kvs_bind_indx(DB *indx, const DBT *pkey, const DBT *item, DBT *skey)
 {
-	kvs_assert(index);
-	kvs_assert(index->app_private);
+	kvs_assert(indx);
+	kvs_assert(indx->app_private);
 	kvs_assert(pkey);
 	kvs_assert(pkey->data);
 	kvs_assert(pkey->size);
@@ -619,7 +640,7 @@ kvs_bind_index(DB *index, const DBT *pkey, const DBT *item, DBT *skey)
 	kvs_assert(item->size);
 	kvs_assert(skey);
 
-	kvs_bind_index_fn      *bind = index->app_private;
+	kvs_bind_indx_fn       *bind = indx->app_private;
 	const struct kvs_chunk  pk = { .size = pkey->size, .data = pkey->data };
 	const struct kvs_chunk  itm = { .size = item->size, .data = item->data };
 	struct kvs_chunk        sk;
@@ -634,6 +655,7 @@ kvs_bind_index(DB *index, const DBT *pkey, const DBT *item, DBT *skey)
 
 	kvs_assert(sk.data);
 
+	memset(skey, 0, sizeof(*skey));
 	skey->data = (void *)sk.data;
 	skey->size = sk.size;
 
@@ -641,27 +663,27 @@ kvs_bind_index(DB *index, const DBT *pkey, const DBT *item, DBT *skey)
 }
 
 int
-kvs_open_index(struct kvs_store       *index,
-               const struct kvs_store *store,
-               const struct kvs_depot *depot,
-               const struct kvs_xact  *xact,
-               const char             *path,
-               const char             *name,
-               mode_t                  mode,
-               kvs_bind_index_fn      *bind)
+kvs_open_indx(struct kvs_store       *indx,
+              const struct kvs_store *store,
+              const struct kvs_depot *depot,
+              const struct kvs_xact  *xact,
+              const char             *path,
+              const char             *name,
+              mode_t                  mode,
+              kvs_bind_indx_fn       *bind)
 {
 	int err;
 
-	err = kvs_open_store(index, depot, xact, path, name, DB_BTREE, mode);
+	err = kvs_open_store(indx, depot, xact, path, name, DB_BTREE, mode);
 	if (err)
 		return kvs_err_from_bdb(err);
 
-	index->db->app_private = bind;
+	indx->db->app_private = bind;
 
 	err = store->db->associate(store->db,
 	                           xact->txn,
-	                           index->db,
-	                           kvs_bind_index,
+	                           indx->db,
+	                           kvs_bind_indx,
 	                           DB_CREATE);
 	kvs_assert(err != EINVAL);
 	kvs_assert(err != DB_REP_HANDLE_DEAD);
@@ -671,7 +693,7 @@ kvs_open_index(struct kvs_store       *index,
 }
 
 int
-kvs_close_index(const struct kvs_store *store)
+kvs_close_indx(const struct kvs_store *store)
 {
 	return kvs_close_store(store);
 }
@@ -812,6 +834,13 @@ kvs_open_depot(struct kvs_depot *depot,
 	if (flags & KVS_DEPOT_THREAD)
 		/* Init the locking subsystem, if threading requested. */
 		flags |= DB_INIT_LOCK;
+
+/*
+ * If KVS_DEPOT_THREAD and or !KVS_DEPOT_PRIV, call depot->env->set_lk_detect()
+ * with appropriate strategy...
+ * See https://docs.oracle.com/database/bdb181/html/programmer_reference/lock.html
+ */
+#warning Setup deadlock detector
 
 	/* Open environment with transaction and automatic recovery support. */
 	err = depot->env->open(depot->env,

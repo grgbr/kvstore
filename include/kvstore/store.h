@@ -83,6 +83,9 @@ kvs_rollback_xact(const struct kvs_xact *xact);
 extern int
 kvs_commit_xact(const struct kvs_xact *xact);
 
+extern int
+kvs_end_xact(const struct kvs_xact *xact, int status);
+
 /******************************************************************************
  * Data store / index handling.
  ******************************************************************************/
@@ -100,21 +103,21 @@ struct kvs_store {
 	DB *db;
 };
 
-typedef int (kvs_bind_index_fn)(const struct kvs_chunk *pkey,
-                                const struct kvs_chunk *item,
-                                struct kvs_chunk       *skey);
+typedef int (kvs_bind_indx_fn)(const struct kvs_chunk *pkey,
+                               const struct kvs_chunk *item,
+                               struct kvs_chunk       *skey);
 
 extern int
-kvs_open_index(struct kvs_store       *index,
-               const struct kvs_store *store,
-               const struct kvs_depot *depot,
-               const struct kvs_xact  *xact,
-               const char             *path,
-               const char             *name,
-               mode_t                  mode,
-               kvs_bind_index_fn      *bind);
+kvs_open_indx(struct kvs_store       *indx,
+              const struct kvs_store *store,
+              const struct kvs_depot *depot,
+              const struct kvs_xact  *xact,
+              const char             *path,
+              const char             *name,
+              mode_t                  mode,
+              kvs_bind_indx_fn       *bind);
 
 extern int
-kvs_close_index(const struct kvs_store *store);
+kvs_close_indx(const struct kvs_store *store);
 
 #endif /* _KVS_STORE_H */

@@ -35,6 +35,19 @@ config KVSTORE_STRREC
 	help
 	  Build kvstore library with string based record primary keying support.
 
+config KVSTORE_TABLE
+	bool "Table"
+	default y
+	help
+	  Build kvstore library with database table support.
+
+config KVSTORE_REPO
+	bool "Table repository"
+	select TABLE
+	default y
+	help
+	  Build kvstore library with database table repository support.
+
 config KVSTORE_LOG
 	bool
 	default n
