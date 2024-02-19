@@ -49,3 +49,9 @@ endef
 
 pkgconfigs         := libkvstore.pc
 libkvstore.pc-tmpl := libkvstore_pkgconf_tmpl
+
+################################################################################
+# Source code tags generation
+################################################################################
+
+tagfiles := $(shell find $(CURDIR) -type f)

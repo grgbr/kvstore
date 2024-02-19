@@ -238,10 +238,10 @@ kvs_autorec_del_byfield(const struct kvs_store *index,
 
 int
 kvs_autorec_open(struct kvs_store       *store,
-                const struct kvs_depot *depot,
-                const struct kvs_xact  *xact,
-                const char             *path,
-                mode_t                  mode)
+                 const struct kvs_depot *depot,
+                 const struct kvs_xact  *xact,
+                 const char             *path,
+                 mode_t                  mode)
 {
 	/* Heap databases don't support named sub-databases. */
 	return kvs_open_store(store, depot, xact, path, NULL, DB_HEAP, mode);
