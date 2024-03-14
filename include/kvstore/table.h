@@ -19,9 +19,11 @@ struct kvs_table_store_ops {
 };
 
 #define kvs_table_assert_store_ops(_ops) \
-	kvs_assert(_ops); \
-	kvs_assert((_ops)->open); \
-	kvs_assert((_ops)->close)
+	({ \
+		kvs_assert(_ops); \
+		kvs_assert((_ops)->open); \
+		kvs_assert((_ops)->close); \
+	 })
 
 struct kvs_table_desc {
 	struct kvs_table_store_ops data_ops;
