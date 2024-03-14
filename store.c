@@ -707,6 +707,15 @@ kvs_close_depot(const struct kvs_depot *depot)
 {
 	kvs_assert_depot(depot);
 
+	char ** paths;
+	int     err;
+
+	err = depot->env->txn_checkpoint(depot->env, 0, 0, 0);
+	kvs_assert(!err);
+
+	err = depot->env->log_archive(depot->env, &paths, DB_ARCH_REMOVE);
+	kvs_assert(!err);
+
 	/*
 	 * No need to use DB_FORCESYNCENV (over NFS) since memory regions are
 	 * located in system memory.
@@ -796,7 +805,12 @@ kvs_open_depot(struct kvs_depot *depot,
 #endif /* defined(CONFIG_KVSTORE_DEBUG) */
 
 	/* Restrict maximum logging file size. */
-	depot->env->set_lg_max(depot->env, max_log_size);
+	err = depot->env->set_lg_max(depot->env, max_log_size);
+	kvs_assert(!err);
+
+	/* Automatically remove log files that are no longer needed. */
+	err = depot->env->log_set_config(depot->env, DB_LOG_AUTO_REMOVE, 1);
+	kvs_assert(!err);
 
 	kvs_init_log(depot);
 
@@ -839,12 +853,15 @@ kvs_open_depot(struct kvs_depot *depot,
 		/* Init the locking subsystem, if threading requested. */
 		flags |= DB_INIT_LOCK;
 
-/*
- * If KVS_DEPOT_THREAD and or !KVS_DEPOT_PRIV, call depot->env->set_lk_detect()
- * with appropriate strategy...
- * See https://docs.oracle.com/database/bdb181/html/programmer_reference/lock.html
- */
-#warning Setup deadlock detector
+	/*
+	 * Setup deadlock detector using the default strategy (random locker
+	 * selection).
+	 * See https://docs.oracle.com/database/bdb181/html/programmer_reference/lock.html
+	 */
+	if ((flags & KVS_DEPOT_THREAD) || !(flags & KVS_DEPOT_PRIV)) {
+		err = depot->env->set_lk_detect(depot->env, DB_LOCK_DEFAULT);
+		kvs_assert(!err);
+	}
 
 	/* Open environment with transaction and automatic recovery support. */
 	err = depot->env->open(depot->env,
@@ -862,6 +879,8 @@ kvs_open_depot(struct kvs_depot *depot,
 		 * environment handle.
 		 */
 		goto err;
+
+	depot->env->txn_checkpoint(depot->env, 0, 0, 0);
 
 	return 0;
 
