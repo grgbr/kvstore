@@ -642,7 +642,11 @@ kvs_bind_indx(DB *indx, const DBT *pkey, const DBT *item, DBT *skey)
 
 	kvs_bind_indx_fn       *bind = indx->app_private;
 	const struct kvs_chunk  pk = { .size = pkey->size, .data = pkey->data };
-	const struct kvs_chunk  itm = { .size = item->size, .data = item->data };
+	const struct kvs_chunk  itm = {
+		.size = item->size,
+		.data = item->data,
+		.priv = item->app_data
+	};
 	struct kvs_chunk        sk;
 	ssize_t                 ret;
 

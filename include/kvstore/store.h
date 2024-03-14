@@ -91,8 +91,9 @@ kvs_end_xact(const struct kvs_xact *xact, int status);
  ******************************************************************************/
 
 struct kvs_chunk {
-	size_t      size;
-	const void *data;
+	size_t       size;
+	const void * data;
+	const void * priv;
 };
 
 struct kvs_iter {

@@ -52,8 +52,9 @@ kvs_serialize_strpile(const struct upile *pile, void **data);
 
 #define KVS_CHUNK_INIT_DBT(_chunk) \
 	{ \
-		.data = (void *)(_chunk)->data, \
-		.size = (_chunk)->size, \
+		.data     = (void *)(_chunk)->data, \
+		.size     = (_chunk)->size, \
+		.app_data = (void *)(_chunk)->priv, \
 		0, \
 	}
 
