@@ -197,7 +197,7 @@ kvs_file_build_at(int         dir,
 	if (ret)
 		goto close;
 
-	ret = ufile_nointr_close(fd);
+	ret = ufile_close(fd);
 	if (ret)
 		goto unlink;
 
@@ -210,7 +210,7 @@ kvs_file_build_at(int         dir,
 	return 0;
 
 close:
-	ufile_nointr_close(fd);
+	ufile_close(fd);
 
 unlink:
 	ufile_unlink_at(dir, tmp);
@@ -320,10 +320,10 @@ kvs_file_handle_log_rec(DB_ENV    *env,
 		if (ret)
 			goto close;
 
-		return -udir_nointr_close(dir);
+		return -udir_close(dir);
 
 close:
-		udir_nointr_close(dir);
+		udir_close(dir);
 
 		return ret;
 	}
@@ -485,7 +485,7 @@ free:
 
 	if (fd >= 0) {
 close:
-		ufile_nointr_close(fd);
+		ufile_close(fd);
 	}
 
 	return ret;
@@ -522,5 +522,5 @@ kvs_file_fini(const struct kvs_file *file)
 	kvs_file_assert(file);
 
 	free(file->data);
-	ufile_nointr_close(file->dir);
+	ufile_close(file->dir);
 }

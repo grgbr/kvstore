@@ -8,6 +8,9 @@
  * Automatic primary keyed record store handling
  ******************************************************************************/
 
+#define KVS_AUTOREC_INVAL_ID \
+	((uint64_t)0)
+
 #define KVS_AUTOREC_MAX_ID \
 	((uint64_t)1 << ((sizeof_member(DB_HEAP_RID, pgno) + \
 	                  sizeof_member(DB_HEAP_RID, indx)) * CHAR_BIT))
