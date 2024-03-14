@@ -591,7 +591,7 @@ kvs_open_store(struct kvs_store       *store,
 	                      type,
 	                      (xact ? 0 : DB_AUTO_COMMIT) | DB_CREATE |
 	                      depot->flags,
-	                      mode);
+	                      mode & ~(S_IXUSR | S_IXGRP | S_IXOTH));
 	kvs_assert(err != DB_REP_HANDLE_DEAD);
 	kvs_assert(err != DB_REP_LOCKOUT);
 
