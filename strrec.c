@@ -98,7 +98,7 @@ kvs_strrec_get_byid(const struct kvs_store *store,
 	int ret;
 
 	ret = kvs_get(store, xact, &key, &itm, 0);
-	kvs_assert(ret != -EXDEV);
+	kvs_assert(ret != DB_SECONDARY_BAD);
 
 	if (ret < 0)
 		return ret;

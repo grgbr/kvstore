@@ -90,7 +90,7 @@ kvs_attr_load_num(const struct kvs_store *store,
 	int        ret;
 
 	ret = kvs_get(store, xact, &key, &item, 0);
-	kvs_assert(ret != -EXDEV);
+	kvs_assert(ret != DB_SECONDARY_BAD);
 
 	if (ret < 0) {
 		errno = -ret;
@@ -127,7 +127,7 @@ kvs_attr_store_num(const struct kvs_store *store,
 	int        ret;
 
 	ret = kvs_put(store, xact, &key, &item, 0);
-	kvs_assert(ret != -EEXIST);
+	kvs_assert(ret != DB_KEYEXIST);
 
 	return ret;
 }
@@ -144,7 +144,7 @@ kvs_attr_clear(const struct kvs_store *store,
 	int        ret;
 
 	ret = kvs_del(store, xact, &key);
-	kvs_assert(ret != -EXDEV);
+	kvs_assert(ret != DB_SECONDARY_BAD);
 
 	return ret;
 }
@@ -200,7 +200,7 @@ kvs_attr_load_str(const struct kvs_store  *store,
 
 
 	ret = kvs_get(store, xact, &key, &item, 0);
-	kvs_assert(ret != -EXDEV);
+	kvs_assert(ret != DB_SECONDARY_BAD);
 	if (ret)
 		return ret;
 
@@ -233,7 +233,7 @@ kvs_attr_store_str(const struct kvs_store *store,
 		return -ENAMETOOLONG;
 
 	ret = kvs_put(store, xact, &key, &item, 0);
-	kvs_assert(ret != -EEXIST);
+	kvs_assert(ret != DB_KEYEXIST);
 
 	return ret;
 }
@@ -263,7 +263,7 @@ kvs_attr_load_strpile(const struct kvs_store  *store,
 	int        ret;
 
 	ret = kvs_get(store, xact, &key, &item, 0);
-	kvs_assert(ret != -EXDEV);
+	kvs_assert(ret != DB_SECONDARY_BAD);
 
 	if (ret < 0)
 		return ret;
@@ -291,7 +291,7 @@ kvs_attr_store_strpile(const struct kvs_store  *store,
 	item.size = ret;
 
 	ret = kvs_put(store, xact, &key, &item, 0);
-	kvs_assert(ret != -EEXIST);
+	kvs_assert(ret != DB_KEYEXIST);
 
 	/* Release memory allocated by serialization process. */
 	free(item.data);

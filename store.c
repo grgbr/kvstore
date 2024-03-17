@@ -38,50 +38,37 @@ kvs_env_dbg(DB_ENV *env, const char *fmt, ...)
 int
 kvs_err_from_bdb(int err)
 {
+	/*
+	 * As stated into db.h, database specific error codes ranges from
+	 * -30,800 to -30,999. In addition libdb may also return positive system
+	 * errno values.
+	 * Make sure that kvstore returns negative error codes only.
+	 */
 	switch (err) {
-	case DB_FOREIGN_CONFLICT:
-		return -EADDRINUSE;
-	case DB_NOTFOUND:
-		return -ENOENT;
-	case DB_KEYEXIST:
-		return -EEXIST;
-	case DB_SECONDARY_BAD:
-		return -EXDEV;
-	case DB_KEYEMPTY:
-		return -ENOKEY;
-	case DB_LOCK_DEADLOCK:
-		return -EDEADLOCK;
-	case DB_LOCK_NOTGRANTED:
-		return -EBUSY;
-	case DB_RUNRECOVERY:
-		return -ENOTRECOVERABLE;
-	default:
+	case -30999 ... -30800:
+		return err;
+	case 0 ... 4095:
 		return -err;
+	default:
+		kvs_assert(0);
 	}
 }
 
 const char *
 kvs_strerror(int err)
 {
+	/*
+	 * Thanks to kvs_err_from_bdb(), kvstore returns negative error codes
+	 * only, including BDB specific error codes as well as negative system
+	 * errno values.
+	 */
 	switch (err) {
-	case -EADDRINUSE:
-		return "Foreign key conflict";
-	case -ENOENT:
-		return "Key/data pair not found";
-	case -EEXIST:
-		return "Key/data pair already exists";
-	case -EXDEV:
-		return "Bad secondary index";
-	case -ENOKEY:
-		return "Key empty";
-	case -EDEADLOCK:
-		return "Deadlock detected";
-	case DB_LOCK_NOTGRANTED:
-		return "Lock not granted";
-	case DB_RUNRECOVERY:
-		return "Unrecoverable error";
-	default:
+	case -30999 ... -30800:
+		return db_strerror(err);
+	case -4095 ... 0:
 		return strerror(-err);
+	default:
+		return "Unknown error code";
 	}
 }
 
@@ -351,12 +338,12 @@ kvs_end_xact(const struct kvs_xact *xact, int status)
 	if (status) {
 		int ret;
 
-		if (status == -ENOTRECOVERABLE)
-			return -ENOTRECOVERABLE;
+		if (status == DB_RUNRECOVERY)
+			return DB_RUNRECOVERY;
 
 		ret = kvs_rollback_xact(xact);
-		if (ret == -ENOTRECOVERABLE)
-			return -ENOTRECOVERABLE;
+		if (ret == DB_RUNRECOVERY)
+			return DB_RUNRECOVERY;
 
 		return status;
 	}
@@ -523,7 +510,7 @@ kvs_put(const struct kvs_store *store,
 	 * index integrity contraint.
 	 */
 	if (ret == EINVAL)
-		return -EEXIST;
+		return DB_KEYEXIST;
 
 	return kvs_err_from_bdb(ret);
 }

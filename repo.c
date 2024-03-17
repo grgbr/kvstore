@@ -17,15 +17,15 @@ kvs_repo_do_close(const struct kvs_repo *repo, unsigned int count)
 		return kvs_close_depot(&repo->depot);
 
 	err = ret;
-	while (count && (err != -ENOTRECOVERABLE)) {
+	while (count && (err != DB_RUNRECOVERY)) {
 		count--;
 		err = kvs_table_close(&repo->tables[count]);
 	}
 
-	if (err != -ENOTRECOVERABLE)
+	if (err != DB_RUNRECOVERY)
 		err = kvs_close_depot(&repo->depot);
 
-	return (err != -ENOTRECOVERABLE) ? ret : -ENOTRECOVERABLE;
+	return (err != DB_RUNRECOVERY) ? ret : DB_RUNRECOVERY;
 }
 
 int
@@ -67,9 +67,9 @@ kvs_repo_open(struct kvs_repo *repo,
 	return 0;
 
 close:
-	if (err != -ENOTRECOVERABLE)
-		if (kvs_repo_do_close(repo, cnt) == -ENOTRECOVERABLE)
-			return -ENOTRECOVERABLE;
+	if (err != DB_RUNRECOVERY)
+		if (kvs_repo_do_close(repo, cnt) == DB_RUNRECOVERY)
+			return DB_RUNRECOVERY;
 
 	return err;
 }

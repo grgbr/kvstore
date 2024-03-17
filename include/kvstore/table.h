@@ -65,12 +65,12 @@ struct kvs_table {
 	kvs_assert(!(_table)->desc->indx_nr || (_table)->indices)
 
 
-static inline struct kvs_store *
+static inline const struct kvs_store *
 kvs_table_get_data_store(const struct kvs_table *table)
 {
 	kvs_table_assert(table);
 
-	return (struct kvs_store *)&table->data;
+	return &table->data;
 }
 
 static inline struct kvs_store *

@@ -5,7 +5,7 @@
 #include <string.h>
 #include <fcntl.h>
 
-int main(int argc, const char * const argv[])
+int main(int argc __unused, const char * const argv[])
 {
 	char             *err_pfx;
 	char             *info_pfx;
