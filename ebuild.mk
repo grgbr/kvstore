@@ -41,7 +41,7 @@ includedir=$${prefix}/include
 Name: libkvstore
 Description: Key/Value store library
 Version: %%PKG_VERSION%%
-Requires.private: $(sort $(libkvstore.so-pkgconf))
+Requires: $(sort $(libkvstore.so-pkgconf))
 Cflags: -I$${includedir}
 Libs.private: -ldb
 Libs: -L$${libdir} -lkvstore
