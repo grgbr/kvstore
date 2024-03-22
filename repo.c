@@ -60,7 +60,7 @@ kvs_repo_open(struct kvs_repo *repo,
 		cnt++;
 	} while (!err && (cnt < nr));
 
-	err = kvs_complete_xact(&xact, err);
+	err = kvs_end_xact(&xact, err);
 	if (err)
 		goto close;
 

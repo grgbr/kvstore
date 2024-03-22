@@ -331,7 +331,7 @@ kvs_rollback_xact(const struct kvs_xact *xact)
 }
 
 int
-kvs_complete_xact(const struct kvs_xact *xact, int status)
+kvs_end_xact(const struct kvs_xact *xact, int status)
 {
 	kvs_assert_xact(xact);
 
