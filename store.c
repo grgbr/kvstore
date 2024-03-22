@@ -305,19 +305,6 @@ kvs_begin_xact(const struct kvs_depot *depot,
 }
 
 int
-kvs_rollback_xact(const struct kvs_xact *xact)
-{
-	kvs_assert_xact(xact);
-
-	int ret;
-
-	ret = xact->txn->abort(xact->txn);
-	kvs_assert(ret != EINVAL);
-
-	return kvs_err_from_bdb(ret);
-}
-
-int
 kvs_commit_xact(const struct kvs_xact *xact)
 {
 	kvs_assert_xact(xact);
@@ -331,24 +318,50 @@ kvs_commit_xact(const struct kvs_xact *xact)
 }
 
 int
-kvs_end_xact(const struct kvs_xact *xact, int status)
+kvs_rollback_xact(const struct kvs_xact *xact)
 {
 	kvs_assert_xact(xact);
 
-	if (status) {
-		int ret;
+	int ret;
 
-		if (status == DB_RUNRECOVERY)
-			return DB_RUNRECOVERY;
+	ret = xact->txn->abort(xact->txn);
+	kvs_assert(ret != EINVAL);
 
-		ret = kvs_rollback_xact(xact);
-		if (ret == DB_RUNRECOVERY)
-			return DB_RUNRECOVERY;
+	return kvs_err_from_bdb(ret);
+}
 
-		return status;
-	}
+int
+kvs_complete_xact(const struct kvs_xact *xact, int status)
+{
+	kvs_assert_xact(xact);
 
-	return kvs_commit_xact(xact);
+	if (!status)
+		return kvs_commit_xact(xact);
+
+	if (status == DB_RUNRECOVERY)
+		return DB_RUNRECOVERY;
+
+	if (kvs_rollback_xact(xact) == DB_RUNRECOVERY)
+		return DB_RUNRECOVERY;
+
+	return status;
+}
+
+int
+kvs_abort_xact(const struct kvs_xact *xact, int status)
+{
+	kvs_assert_xact(xact);
+
+	if (!status)
+		return kvs_rollback_xact(xact);
+
+	if (status == DB_RUNRECOVERY)
+		return DB_RUNRECOVERY;
+
+	if (kvs_rollback_xact(xact) == DB_RUNRECOVERY)
+		return DB_RUNRECOVERY;
+
+	return status;
 }
 
 #define kvs_assert_iter(_iter) \

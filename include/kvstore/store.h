@@ -84,7 +84,10 @@ extern int
 kvs_commit_xact(const struct kvs_xact *xact);
 
 extern int
-kvs_end_xact(const struct kvs_xact *xact, int status);
+kvs_complete_xact(const struct kvs_xact *xact, int status);
+
+extern int
+kvs_abort_xact(const struct kvs_xact *xact, int status);
 
 /******************************************************************************
  * Data store / index handling.
