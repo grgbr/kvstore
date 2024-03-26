@@ -16,6 +16,7 @@ libkvstore.so-ldflags  = $(EXTRA_LDFLAGS) \
                          -ldb
 libkvstore.so-pkgconf  = $(call kconf_enabled,KVSTORE_ASSERT,libutils)
 libkvstore.so-pkgconf += $(call kconf_enabled,KVSTORE_FILE,libutils)
+libkvstore.so-pkgconf += $(call kconf_enabled,KVSTORE_LOG,libstroll)
 
 HEADERDIR             := $(CURDIR)/include
 headers                = kvstore/store.h
@@ -40,11 +41,13 @@ includedir=$${prefix}/include
 
 Name: libkvstore
 Description: Key/Value store library
-Version: %%PKG_VERSION%%
-Requires: $(sort $(libkvstore.so-pkgconf))
+Version: $(VERSION)
+Requires: $(sort $(call kconf_enabled,KVSTORE_ASSERT,libutils) \
+                 $(call kconf_enabled,KVSTORE_FILE,libutils))
+Requires.private: $(call kconf_enabled,KVSTORE_LOG,libstroll)
 Cflags: -I$${includedir}
+Libs: -L$${libdir} -Wl,--push-state,--as-needed -lkvstore -Wl,--pop-state
 Libs.private: -ldb
-Libs: -L$${libdir} -lkvstore
 endef
 
 pkgconfigs         := libkvstore.pc

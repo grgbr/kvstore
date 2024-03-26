@@ -1,4 +1,5 @@
 #include "common.h"
+#include <stroll/cdefs.h>
 #include <errno.h>
 
 
@@ -43,7 +44,7 @@ kvs_handle_log_rec(DB_ENV *env, DBT *rec, DB_LSN *lsn, db_recops op)
 		return EFAULT;
 
 	type = ((struct kvs_log_rec *)rec->data)->type - KVS_USER_LOG_REC;
-	if (type >= array_nr(kvs_log_rec_dispatchers))
+	if (type >= stroll_array_nr(kvs_log_rec_dispatchers))
 		return ENOTSUP;
 
 	return kvs_log_rec_dispatchers[type](env, rec, lsn, op);
